@@ -1,18 +1,395 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
 
+/* ------------------------------------------------------------------ */
+/* Color ramps. `static` is required: Nuxt UI resolves                 */
+/* --ui-color-primary-400 as var(--color-cobalt-400) at runtime, so the  */
+/* ramp variables must be emitted even when no utility references them. */
+/* ------------------------------------------------------------------ */
 @theme static {
-  --font-sans: 'Public Sans', sans-serif;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Bricolage Grotesque', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Spline Sans Mono', ui-monospace, SFMono-Regular, monospace;
+  --font-code: 'Geist Mono', ui-monospace, SFMono-Regular, monospace;
+  --font-lead: 'Instrument Sans', 'Inter', ui-sans-serif, system-ui, sans-serif;
 
-  --color-green-50: #EFFDF5;
-  --color-green-100: #D9FBE8;
-  --color-green-200: #B3F5D1;
-  --color-green-300: #75EDAE;
-  --color-green-400: #00DC82;
-  --color-green-500: #00C16A;
-  --color-green-600: #00A155;
-  --color-green-700: #007F45;
-  --color-green-800: #016538;
-  --color-green-900: #0A5331;
-  --color-green-950: #052E16;
+  /* primary: cobalt, the Answer United logo blue (#16348c). 500 = light primary;
+     400 = dark primary, lightened because the logo blue is unreadable on the dark page */
+  --color-cobalt-50: #eef2fc;
+  --color-cobalt-100: #dbe3f8;
+  --color-cobalt-200: #b6c6f1;
+  --color-cobalt-300: #9cb2f4;
+  --color-cobalt-400: #6f8ff0;
+  --color-cobalt-500: #16348c;
+  --color-cobalt-600: #122c78;
+  --color-cobalt-700: #0f2463;
+  --color-cobalt-800: #0b1b4b;
+  --color-cobalt-900: #081234;
+  --color-cobalt-950: #040a1d;
+
+  /* neutral: warm ink / paper */
+  --color-ink-50: #fafafa;
+  --color-ink-100: #f4f4f5;
+  --color-ink-200: #e4e4e7;
+  --color-ink-300: #d4d4d8;
+  --color-ink-400: #c9c4b8;
+  --color-ink-500: #8e897d;
+  --color-ink-600: #5a574e;
+  --color-ink-700: #2c2e33;
+  --color-ink-800: #1b1c1f;
+  --color-ink-900: #0f1113;
+  --color-ink-950: #090a0c;
+
+  /* status ramps (only 400/500/600 are visible in practice) */
+  --color-ember-50: #fdf1ef;
+  --color-ember-100: #fadcd7;
+  --color-ember-200: #f4b6ab;
+  --color-ember-300: #ec8c7c;
+  --color-ember-400: #e36350;
+  --color-ember-500: #d64545;
+  --color-ember-600: #b33a2b;
+  --color-ember-700: #8f2f22;
+  --color-ember-800: #6b241a;
+  --color-ember-900: #481812;
+  --color-ember-950: #2a0d0a;
+
+  --color-ochre-50: #faf6ec;
+  --color-ochre-100: #f3ead1;
+  --color-ochre-200: #e6d6a5;
+  --color-ochre-300: #d6bd7b;
+  --color-ochre-400: #c2a35c;
+  --color-ochre-500: #a88b45;
+  --color-ochre-600: #8a6f33;
+  --color-ochre-700: #6c5627;
+  --color-ochre-800: #4f3f1c;
+  --color-ochre-900: #342a13;
+  --color-ochre-950: #1e180b;
+
+  --color-sage-50: #f0f5f0;
+  --color-sage-100: #dde8de;
+  --color-sage-200: #bdd2bf;
+  --color-sage-300: #9db89f;
+  --color-sage-400: #7d9a7f;
+  --color-sage-500: #6a876c;
+  --color-sage-600: #5e7a60;
+  --color-sage-700: #4a604c;
+  --color-sage-800: #374738;
+  --color-sage-900: #253026;
+  --color-sage-950: #151b16;
+
+  /* radii */
+  --radius-subtle: 10px;
+  --radius-standard: 16px;
+  --radius-elevated: 20px;
+  --radius-control: 4px;
+
+  /* type scale (site values) */
+  --text-kicker: 11.5px;
+  --text-kicker--line-height: 1.2;
+  --text-kicker-sm: 10.5px;
+  --text-kicker-sm--line-height: 1.2;
+  --text-nav: 11px;
+  --text-nav--line-height: 1.2;
+  --text-field: 10px;
+  --text-field--line-height: 1.5;
+  --text-body: 15.9px;
+  --text-body--line-height: 1.5;
+  --text-body-sm: 13.8px;
+  --text-body-sm--line-height: 1.5;
+  --text-body-lg: 18px;
+  --text-body-lg--line-height: 1.55;
+  --text-label: 13.8px;
+  --text-label--line-height: 1.4;
+  --text-metadata: 12.75px;
+  --text-metadata--line-height: 1.4;
+  --text-badge: 11.7px;
+  --text-badge--line-height: 1.5;
+  --text-badge-xs: 8.5px;
+  --text-badge-xs--line-height: 1;
+
+  --font-weight-reg: 370;
+  --font-weight-med: 460;
+  --font-weight-semi: 520;
+  --font-weight-heavy: 640;
+
+  --tracking-kicker: 0.14em;
+  --tracking-nav: 0.11em;
+  --tracking-nav-kicker: 0.16em;
+  --tracking-field: 0.13em;
+  --tracking-meta: 0.06em;
+  --tracking-display: -0.015em;
+
+  --ease-ink: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ------------------------------------------------------------------ */
+/* App-level tokens that flip with color mode. Kept out of @theme so    */
+/* they can be redefined under .dark, then exposed as utilities below.  */
+/* ------------------------------------------------------------------ */
+:root {
+  --ink-sidebar: #f2f2f4;
+  --ink-sidebar-border: rgba(17, 19, 24, 0.08);
+  --ink-rail-active: #e7e7ea;
+  --ink-rail-hover: #ebebee;
+  --ink-cobalt-hover: #122c78;
+  --ink-cobalt-text: #16348c;
+  --ink-cobalt-muted: #0f2463;
+  --ink-cobalt-bg: rgba(22, 52, 140, 0.08);
+  --ink-cobalt-border: rgba(22, 52, 140, 0.35);
+  --ink-switch-track: rgba(23, 26, 32, 0.2);
+  --ink-switch-thumb: #ffffff;
+  --ink-field-line: color-mix(in srgb, var(--ui-border) 60%, transparent);
+  --ink-avatar: #a87795;
+  --ink-avatar-ink: #180e08;
+  --ink-scrim: rgba(247, 247, 248, 0.85);
+  --ink-code-bg: #ffffff;
+  --ink-banner-from: #ffffff;
+  --ink-banner-to: #eeeef0;
+}
+
+.dark {
+  --ink-sidebar: #07080b;
+  --ink-sidebar-border: rgba(246, 243, 236, 0.08);
+  --ink-rail-active: #040406;
+  --ink-rail-hover: #131416;
+  --ink-cobalt-hover: #8aa4f3;
+  --ink-cobalt-text: #8aa4f3;
+  --ink-cobalt-muted: #5a76c9;
+  --ink-cobalt-bg: rgba(111, 143, 240, 0.1);
+  --ink-cobalt-border: rgba(111, 143, 240, 0.38);
+  --ink-switch-track: rgba(246, 243, 236, 0.2);
+  --ink-switch-thumb: #f6f3ec;
+  --ink-scrim: rgba(9, 10, 12, 0.82);
+  --ink-code-bg: #0f1113;
+  --ink-banner-from: #1b1c1f;
+  --ink-banner-to: #0b0c0e;
+}
+
+@theme inline {
+  --color-sidebar: var(--ink-sidebar);
+  --color-sidebar-border: var(--ink-sidebar-border);
+  --color-rail-active: var(--ink-rail-active);
+  --color-rail-hover: var(--ink-rail-hover);
+  --color-cobalt-hover: var(--ink-cobalt-hover);
+  --color-cobalt-text: var(--ink-cobalt-text);
+  --color-cobalt-muted: var(--ink-cobalt-muted);
+  --color-cobalt-bg: var(--ink-cobalt-bg);
+  --color-cobalt-border: var(--ink-cobalt-border);
+  --color-switch-track: var(--ink-switch-track);
+  --color-switch-thumb: var(--ink-switch-thumb);
+  --color-field-line: var(--ink-field-line);
+  --color-avatar: var(--ink-avatar);
+  --color-avatar-ink: var(--ink-avatar-ink);
+  --color-scrim: var(--ink-scrim);
+  --color-code-bg: var(--ink-code-bg);
+  --color-banner-from: var(--ink-banner-from);
+  --color-banner-to: var(--ink-banner-to);
+}
+
+/* ------------------------------------------------------------------ */
+/* Nuxt UI semantic tokens. Unlayered so they beat Nuxt UI's           */
+/* @layer theme defaults. Light mode is neutral gray and white; dark    */
+/* mode keeps the ink palette. Note: the card colour rides on           */
+/* --ui-bg-muted because the light card (#ffffff) is lighter than the   */
+/* light page (#f7f7f8) and cannot be derived from the ramp order.      */
+/* ------------------------------------------------------------------ */
+:root, .light {
+  --ui-radius: 0.5rem;
+  --ui-bg: #f7f7f8;
+  --ui-bg-muted: #ffffff;
+  --ui-bg-elevated: #eeeef0;
+  --ui-bg-accented: #e4e4e7;
+  --ui-bg-inverted: #171a20;
+  --ui-text-dimmed: #8b8e95;
+  --ui-text-muted: #5c5f66;
+  --ui-text-toned: #45484f;
+  --ui-text: #171a20;
+  --ui-text-highlighted: #171a20;
+  --ui-text-inverted: #ffffff;
+  --ui-border: rgba(17, 19, 24, 0.12);
+  --ui-border-muted: rgba(17, 19, 24, 0.08);
+  --ui-border-accented: rgba(17, 19, 24, 0.18);
+  --ui-border-inverted: #171a20;
+}
+
+.dark {
+  --ui-bg: #090a0c;
+  --ui-bg-muted: #0f1113;
+  --ui-bg-elevated: #16181a;
+  --ui-bg-accented: #1b1c1f;
+  --ui-bg-inverted: #f6f3ec;
+  --ui-text-dimmed: #6f6b61;
+  --ui-text-muted: #8e897d;
+  --ui-text-toned: #c9c4b8;
+  --ui-text: #f6f3ec;
+  --ui-text-highlighted: #f6f3ec;
+  --ui-text-inverted: #180e08;
+  --ui-border: rgba(246, 243, 236, 0.14);
+  --ui-border-muted: rgba(246, 243, 236, 0.09);
+  --ui-border-accented: rgba(246, 243, 236, 0.22);
+  --ui-border-inverted: #f6f3ec;
+}
+
+/* ------------------------------------------------------------------ */
+/* Base typography                                                      */
+/* ------------------------------------------------------------------ */
+@layer base {
+  html {
+    font-size: 17px;
+    letter-spacing: 0.005em;
+  }
+
+  body {
+    font-weight: 400;
+    line-height: 1.5;
+  }
+
+  .dark body {
+    font-weight: 370;
+  }
+
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    font-weight: 640;
+    letter-spacing: -0.015em;
+  }
+
+  h4, h5 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ui-primary);
+    outline-offset: 2px;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Reusable primitives                                                  */
+/* ------------------------------------------------------------------ */
+@utility kicker {
+  font-family: var(--font-mono);
+  font-size: var(--text-kicker);
+  line-height: var(--text-kicker--line-height);
+  font-weight: 500;
+  letter-spacing: var(--tracking-kicker);
+  text-transform: uppercase;
+  color: var(--ui-text-muted);
+}
+
+@utility kicker-nav {
+  font-family: var(--font-mono);
+  font-size: var(--text-kicker-sm);
+  line-height: var(--text-kicker-sm--line-height);
+  font-weight: 500;
+  letter-spacing: var(--tracking-nav-kicker);
+  text-transform: uppercase;
+  color: var(--ui-text-muted);
+}
+
+@utility mono-meta {
+  font-family: var(--font-mono);
+  font-size: var(--text-kicker);
+  line-height: 1.5;
+  font-weight: 500;
+  letter-spacing: var(--tracking-meta);
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-text-muted);
+}
+
+@utility hairline {
+  flex: 1 1 0%;
+  height: 1px;
+  align-self: center;
+  background-color: var(--ui-border-muted);
+}
+
+@utility press-control {
+  transition-property: color, background-color, border-color, opacity, box-shadow, transform, scale;
+  transition-duration: 150ms;
+  transition-timing-function: ease-out;
+  &:active {
+    scale: 0.97;
+    transition: none;
+  }
+}
+
+@utility lift {
+  transition: transform 140ms var(--ease-ink);
+  &:hover {
+    transform: translateY(-1px);
+  }
+}
+
+@utility dotted-track {
+  background-image: repeating-linear-gradient(
+    to right,
+    color-mix(in oklab, var(--ui-text) 13%, transparent) 0 3px,
+    transparent 3px 10px
+  );
+}
+
+@utility dotted-track-y {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    color-mix(in oklab, var(--ui-text) 13%, transparent) 0 3px,
+    transparent 3px 10px
+  );
+}
+
+@utility glow-primary {
+  box-shadow: 0 0 8px color-mix(in oklab, var(--ui-primary) 50%, transparent);
+}
+
+
+/* Long-form text such as the terms and privacy pages */
+@utility legal-prose {
+  font-size: var(--text-body);
+  line-height: 1.7;
+  color: var(--ui-text-toned);
+
+  & h2 {
+    margin-top: 2.75rem;
+    margin-bottom: 0.75rem;
+    font-size: 22px;
+    line-height: 1.25;
+    color: var(--ui-text-highlighted);
+  }
+
+  & h3 {
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 17px;
+    color: var(--ui-text-highlighted);
+  }
+
+  & p, & ul {
+    margin-top: 0.75rem;
+  }
+
+  & ul {
+    padding-left: 1.25rem;
+    list-style: disc;
+  }
+
+  & li + li {
+    margin-top: 0.4rem;
+  }
+
+  & li::marker {
+    color: var(--ui-text-dimmed);
+  }
+
+  & strong {
+    font-weight: 600;
+    color: var(--ui-text-highlighted);
+  }
+
+  & a {
+    color: var(--ink-cobalt-text);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
 }
