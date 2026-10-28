@@ -25,3 +25,9 @@ export const supportRequestSchema = z.object({
 })
 
 export const timezoneSchema = z.enum(TIMEZONE_IDS)
+
+export const recordingColumnsSchema = z.array(z.enum(RECORDING_COLUMNS)).max(RECORDING_COLUMNS.length)
+
+export const accountNumberSchema = z.string()
+  .trim()
+  .regex(/^[A-Za-z0-9-]{1,32}$/, 'Use up to 32 letters, numbers and hyphens')

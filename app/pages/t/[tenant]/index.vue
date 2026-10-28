@@ -1,11 +1,6 @@
 <script setup lang="ts">
 const { tenant } = useTenant()
 useSeoMeta({ title: () => tenant.value?.name ?? 'Dashboard' })
-
-const cards = [
-  { title: 'Messages', icon: 'i-lucide-message-square', description: 'Messages taken on your behalf will appear here.' },
-  { title: 'Call recordings', icon: 'i-lucide-audio-lines', description: 'Recordings of your calls will appear here.' }
-]
 </script>
 
 <template>
@@ -17,31 +12,40 @@ const cards = [
     />
 
     <section class="mt-10">
-      <SectionKicker
-        number="01"
-        label="Coming soon"
-        class="mb-4"
-      />
       <div class="grid gap-4 sm:grid-cols-2">
-        <div
-          v-for="card in cards"
-          :key="card.title"
-          class="flex items-start gap-4 rounded-standard border border-default bg-muted p-[22px]"
+        <NuxtLink
+          :to="`/t/${tenant?.slug}/recordings`"
+          class="group flex items-start gap-4 rounded-standard border border-default bg-muted p-[22px] transition-colors hover:border-accented"
         >
-          <IconTile :icon="card.icon" />
-          <div class="min-w-0">
-            <p class="font-display text-[19px] font-semi text-highlighted">
-              {{ card.title }}
+          <IconTile icon="i-lucide-audio-lines" />
+          <div class="min-w-0 flex-1">
+            <p class="font-display text-[19px] font-semi text-highlighted decoration-primary decoration-2 underline-offset-[5px] group-hover:underline">
+              Call recordings
             </p>
             <p class="mt-1 text-body-sm text-muted">
-              {{ card.description }}
+              Find a call and listen to it.
             </p>
+          </div>
+          <UIcon
+            name="i-lucide-arrow-right"
+            class="mt-1 size-4 text-muted transition-transform duration-[140ms] group-hover:translate-x-0.5 group-hover:text-primary"
+          />
+        </NuxtLink>
+        <div class="flex items-start gap-4 rounded-standard border border-default bg-muted p-[22px]">
+          <IconTile icon="i-lucide-message-square" />
+          <div class="min-w-0">
+            <p class="font-display text-[19px] font-semi text-highlighted">
+              Messages
+            </p>
+            <p class="mt-1 text-body-sm text-muted">
+              Messages taken on your behalf will appear here.
+            </p>
+            <AsideNote class="mt-2">
+              Coming soon.
+            </AsideNote>
           </div>
         </div>
       </div>
-      <AsideNote class="mt-6">
-        We're building these now.
-      </AsideNote>
     </section>
   </div>
 </template>

@@ -22,6 +22,13 @@
       "when": 1793209321216,
       "tag": "0002_timezones",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1793211397954,
+      "tag": "0003_recordings",
+      "breakpoints": true
     }
   ]
 }

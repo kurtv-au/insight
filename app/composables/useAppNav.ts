@@ -19,6 +19,7 @@ export function useAppNav() {
     const base = `/t/${tenant.value.slug}`
     return [
       { icon: 'i-lucide-layout-dashboard', label: 'Dashboard', to: base, exact: true },
+      { icon: 'i-lucide-audio-lines', label: 'Recordings', to: `${base}/recordings` },
       ...(can('admin')
         ? [
             { icon: 'i-lucide-users', label: 'Members', to: `${base}/members` },

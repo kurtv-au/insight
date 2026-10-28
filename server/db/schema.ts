@@ -14,6 +14,7 @@ import {
 import { ROLES } from '../../shared/utils/roles.ts'
 import { TENANT_STATUSES } from '../../shared/utils/tenants.ts'
 import { DEFAULT_TIMEZONE } from '../../shared/utils/timezones.ts'
+import type { RecordingColumn } from '../../shared/utils/recordings.ts'
 
 const id = () => varchar('id', { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID())
 const createdAt = () => datetime('created_at').notNull().$defaultFn(() => new Date())
@@ -26,6 +27,10 @@ export const tenants = mysqlTable('tenants', {
   status: mysqlEnum('status', TENANT_STATUSES).notNull().default('setup'),
   // IANA timezone that messages and recordings are shown in, unless a user picks their own
   timezone: varchar('timezone', { length: 64 }).notNull().default(DEFAULT_TIMEZONE),
+  // Recording columns platform admins make available; null means DEFAULT_AVAILABLE_COLUMNS
+  recordingColumns: json('recording_columns').$type<RecordingColumn[]>(),
+  // Columns members see until they choose their own; null means every available column
+  recordingDefaultColumns: json('recording_default_columns').$type<RecordingColumn[]>(),
   createdAt: createdAt(),
   updatedAt: updatedAt()
 })
@@ -56,6 +61,26 @@ export const memberships = mysqlTable('memberships', {
 }, table => [
   primaryKey({ columns: [table.tenantId, table.userId] }),
   index('memberships_user_id_idx').on(table.userId)
+])
+
+// Recordings from these account numbers belong to the tenant. Most tenants have one.
+export const tenantRecordingAccounts = mysqlTable('tenant_recording_accounts', {
+  accountNumber: varchar('account_number', { length: 32 }).primaryKey(),
+  tenantId: varchar('tenant_id', { length: 36 }).notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  createdAt: createdAt()
+}, table => [
+  index('tenant_recording_accounts_tenant_id_idx').on(table.tenantId)
+])
+
+// A user's own settings within one tenant
+export const userTenantPreferences = mysqlTable('user_tenant_preferences', {
+  userId: varchar('user_id', { length: 36 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
+  tenantId: varchar('tenant_id', { length: 36 }).notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  // Null follows the tenant's default columns
+  recordingColumns: json('recording_columns').$type<RecordingColumn[]>(),
+  updatedAt: updatedAt()
+}, table => [
+  primaryKey({ columns: [table.userId, table.tenantId] })
 ])
 
 export const invitations = mysqlTable('invitations', {
@@ -111,7 +136,12 @@ export const webauthnChallenges = mysqlTable('webauthn_challenges', {
 
 export const tenantsRelations = relations(tenants, ({ many }) => ({
   memberships: many(memberships),
-  invitations: many(invitations)
+  invitations: many(invitations),
+  recordingAccounts: many(tenantRecordingAccounts)
+}))
+
+export const tenantRecordingAccountsRelations = relations(tenantRecordingAccounts, ({ one }) => ({
+  tenant: one(tenants, { fields: [tenantRecordingAccounts.tenantId], references: [tenants.id] })
 }))
 
 export const usersRelations = relations(users, ({ many }) => ({
