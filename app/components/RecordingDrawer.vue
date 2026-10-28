@@ -2,13 +2,14 @@
 const props = defineProps<{
   tenantId: string
   recording: RecordingDto | null
-  hasNewer: boolean
-  hasOlder: boolean
+  hasPrevious: boolean
+  hasNext: boolean
 }>()
 
+// Steps through the list in its current order
 const emit = defineEmits<{
-  newer: []
-  older: []
+  previous: []
+  next: []
 }>()
 
 const open = defineModel<boolean>('open', { required: true })
@@ -78,20 +79,20 @@ const details = computed(() => {
     <template #footer>
       <div class="flex w-full justify-between gap-2">
         <UButton
-          label="Newer"
+          label="Previous"
           icon="i-lucide-chevron-up"
           color="neutral"
           variant="outline"
-          :disabled="!hasNewer"
-          @click="emit('newer')"
+          :disabled="!hasPrevious"
+          @click="emit('previous')"
         />
         <UButton
-          label="Older"
+          label="Next"
           trailing-icon="i-lucide-chevron-down"
           color="neutral"
           variant="outline"
-          :disabled="!hasOlder"
-          @click="emit('older')"
+          :disabled="!hasNext"
+          @click="emit('next')"
         />
       </div>
     </template>

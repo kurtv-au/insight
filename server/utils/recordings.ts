@@ -21,6 +21,9 @@ export interface RecordingQuery {
   searchAgent?: boolean
   accountNumber?: string
   minDuration?: number
+  /** Ties, and calls with no caller ID, go newest first after the sorted column */
+  sort: RecordingColumn
+  direction: SortDirection
   offset: number
   limit: number
 }
@@ -28,7 +31,7 @@ export interface RecordingQuery {
 // The recording source. These use generated mock data until the live recordings
 // API is connected; swap the implementations here and nothing else changes.
 
-/** Matching recordings, newest first */
+/** Matching recordings in the query's order, one page at a time */
 export async function listRecordings(query: RecordingQuery): Promise<{ items: Recording[], total: number }> {
   if (!query.accountNumbers.length) {
     return { items: [], total: 0 }

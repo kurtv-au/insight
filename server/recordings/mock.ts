@@ -96,27 +96,48 @@ function matches(recording: Recording, query: RecordingQuery, now: number) {
   return true
 }
 
+const SORT_VALUES: Record<RecordingColumn, (recording: Recording) => string | number | null> = {
+  timestamp: recording => recording.startedAt.getTime(),
+  ani: recording => recording.ani,
+  agent: recording => recording.agent,
+  accountNumber: recording => recording.accountNumber,
+  duration: recording => recording.durationSeconds
+}
+
+/** Sorted column first, then newest first, then ID so pages never overlap */
+function compareBy(sort: RecordingColumn, direction: SortDirection) {
+  const value = SORT_VALUES[sort]
+  const sign = direction === 'asc' ? 1 : -1
+  return (a: Recording, b: Recording) => {
+    const x = value(a)
+    const y = value(b)
+    if (x !== y) {
+      // Unknown caller IDs go last either way
+      if (x === null) {
+        return 1
+      }
+      if (y === null) {
+        return -1
+      }
+      return (x < y ? -1 : 1) * sign
+    }
+    return b.startedAt.getTime() - a.startedAt.getTime() || (a.id < b.id ? -1 : 1)
+  }
+}
+
 export function listMockRecordings(query: RecordingQuery) {
   const now = Date.now()
   const today = Math.floor(now / DAY_MS)
-  const items: Recording[] = []
-  let total = 0
+  const matching: Recording[] = []
 
   for (let day = today; day > today - DAYS; day--) {
-    const recordings = query.accountNumbers
-      .flatMap(accountNumber => dayRecordings(accountNumber, day))
-      .sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime())
-    for (const recording of recordings) {
-      if (!matches(recording, query, now)) {
-        continue
-      }
-      if (total >= query.offset && items.length < query.limit) {
-        items.push(recording)
-      }
-      total++
+    for (const accountNumber of query.accountNumbers) {
+      matching.push(...dayRecordings(accountNumber, day).filter(recording => matches(recording, query, now)))
     }
   }
-  return { items, total }
+
+  matching.sort(compareBy(query.sort, query.direction))
+  return { items: matching.slice(query.offset, query.offset + query.limit), total: matching.length }
 }
 
 export function getMockRecording(id: string) {

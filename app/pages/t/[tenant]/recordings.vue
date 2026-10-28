@@ -49,6 +49,26 @@ const filters = computed(() => ({
 }))
 const hasFilters = computed(() => !!(filters.value.q || filters.value.from || filters.value.min || filters.value.account))
 
+// Sorting happens on the server. Only shown columns sort, so hiding the sorted
+// column goes back to newest first.
+const sort = computed(() => {
+  const column = queryString('sort') as RecordingColumn | undefined
+  const by = column && columns.value.includes(column) ? column : 'timestamp'
+  const dir = queryString('dir')
+  return { by, direction: dir === 'asc' || dir === 'desc' ? dir : RECORDING_SORT_DEFAULTS[by] }
+})
+
+function sortBy(column: RecordingColumn) {
+  const direction = sort.value.by === column
+    ? (sort.value.direction === 'asc' ? 'desc' : 'asc')
+    : RECORDING_SORT_DEFAULTS[column]
+  // Defaults stay out of the URL
+  updateQuery({
+    sort: column === 'timestamp' ? undefined : column,
+    dir: direction === RECORDING_SORT_DEFAULTS[column] ? undefined : direction
+  })
+}
+
 type QueryPatch = Record<string, string | number | undefined>
 
 function updateQuery(patch: QueryPatch, { keepPage = false, replace = false } = {}) {
@@ -74,7 +94,9 @@ const apiQuery = computed(() => ({
   from: filters.value.from?.toDate(timezone.value).toISOString(),
   to: filters.value.to?.add({ days: 1 }).toDate(timezone.value).toISOString(),
   minDuration: filters.value.min || undefined,
-  account: filters.value.account
+  account: filters.value.account,
+  sort: sort.value.by,
+  dir: sort.value.direction
 }))
 
 const { data: results, status } = await useFetch(api, {
@@ -187,12 +209,30 @@ const columnMenu = computed<DropdownMenuItem[][]>(() => [
 
 // Table
 const UIcon = resolveComponent('UIcon')
+const UButton = resolveComponent('UButton')
 const selectedId = computed(() => queryString('r'))
+
+const SORT_ICONS: Record<SortDirection, string> = { asc: 'i-lucide-arrow-up', desc: 'i-lucide-arrow-down' }
+
+function sortHeader(column: RecordingColumn) {
+  const label = RECORDING_COLUMN_LABELS[column]
+  const active = sort.value.by === column
+  return h(UButton, {
+    'label': label,
+    'color': 'neutral',
+    'variant': 'ghost',
+    'trailingIcon': active ? SORT_ICONS[sort.value.direction] : 'i-lucide-arrow-up-down',
+    'class': '-mx-2.5 font-semibold',
+    'ui': { trailingIcon: active ? 'text-primary' : 'text-dimmed' },
+    'aria-label': active ? `${label}, sorted ${sort.value.direction === 'asc' ? 'ascending' : 'descending'}` : `Sort by ${label}`,
+    'onClick': () => sortBy(column)
+  })
+}
 
 const COLUMN_DEFS: Record<RecordingColumn, TableColumn<RecordingDto>> = {
   timestamp: {
     id: 'timestamp',
-    header: RECORDING_COLUMN_LABELS.timestamp,
+    header: () => sortHeader('timestamp'),
     cell: ({ row }) => h('span', { class: 'flex items-center gap-2 whitespace-nowrap' }, [
       row.original.id === selectedId.value
         ? h(UIcon, { 'name': 'i-lucide-audio-lines', 'class': 'size-4 shrink-0 animate-pulse text-primary', 'aria-label': 'Now playing' })
@@ -202,22 +242,22 @@ const COLUMN_DEFS: Record<RecordingColumn, TableColumn<RecordingDto>> = {
   },
   ani: {
     id: 'ani',
-    header: RECORDING_COLUMN_LABELS.ani,
+    header: () => sortHeader('ani'),
     cell: ({ row }) => h('span', { class: ['whitespace-nowrap tabular-nums', !row.original.ani && 'text-muted'] }, formatPhone(row.original.ani))
   },
   agent: {
     id: 'agent',
-    header: RECORDING_COLUMN_LABELS.agent,
+    header: () => sortHeader('agent'),
     cell: ({ row }) => row.original.agent
   },
   accountNumber: {
     id: 'accountNumber',
-    header: RECORDING_COLUMN_LABELS.accountNumber,
+    header: () => sortHeader('accountNumber'),
     cell: ({ row }) => h('span', { class: 'tabular-nums' }, row.original.accountNumber)
   },
   duration: {
     id: 'duration',
-    header: RECORDING_COLUMN_LABELS.duration,
+    header: () => sortHeader('duration'),
     cell: ({ row }) => h('span', { class: 'tabular-nums' }, row.original.durationSeconds !== undefined ? formatDuration(row.original.durationSeconds) : ''),
     meta: { class: { th: 'text-right', td: 'text-right' } }
   }
@@ -234,11 +274,16 @@ const tableMeta = {
 
 // Drawer
 const selectedIndex = computed(() => results.value.items.findIndex(r => r.id === selectedId.value))
-// A shared link can point at a recording that isn't on this page of results
+// A shared link can point at a recording that isn't on this page of results, and
+// sorting or filtering can move the open one off it, so remember the open one
 const linkedRecording = ref<RecordingDto | null>(null)
-watch(selectedId, async (id) => {
-  linkedRecording.value = null
-  if (id && selectedIndex.value === -1) {
+watch(() => results.value.items[selectedIndex.value], (recording) => {
+  if (recording) {
+    linkedRecording.value = recording
+  }
+})
+watch([selectedId, selectedIndex], async ([id, index]) => {
+  if (id && index === -1 && linkedRecording.value?.id !== id) {
     try {
       linkedRecording.value = await requestFetch<RecordingDto>(`${api}/${encodeURIComponent(id)}`)
     } catch (err) {
@@ -248,7 +293,8 @@ watch(selectedId, async (id) => {
   }
 }, { immediate: true })
 
-const selected = computed(() => results.value.items[selectedIndex.value] ?? linkedRecording.value)
+const selected = computed(() => results.value.items[selectedIndex.value]
+  ?? (linkedRecording.value?.id === selectedId.value ? linkedRecording.value : null))
 // On wide screens the list makes room for the open drawer instead of sitting under it
 const drawerOpen = computed({
   get: () => !!selectedId.value,
@@ -285,7 +331,7 @@ function changePage(page: number) {
     <PageHeader
       :kicker="tenant?.name ?? 'Account'"
       title="Recordings"
-      :description="`Your recorded calls, newest first. Times are shown in ${timezoneName}.`"
+      :description="`Your recorded calls. Times are shown in ${timezoneName}.`"
     >
       <template #actions>
         <UDropdownMenu
@@ -431,10 +477,10 @@ function changePage(page: number) {
       v-model:open="drawerOpen"
       :tenant-id="tenantId"
       :recording="selected"
-      :has-newer="selectedIndex > 0"
-      :has-older="selectedIndex !== -1 && selectedIndex < results.items.length - 1"
-      @newer="step(-1)"
-      @older="step(1)"
+      :has-previous="selectedIndex > 0"
+      :has-next="selectedIndex !== -1 && selectedIndex < results.items.length - 1"
+      @previous="step(-1)"
+      @next="step(1)"
     />
   </div>
 </template>

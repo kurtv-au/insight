@@ -26,6 +26,18 @@ export interface RecordingDto {
 
 export const DEFAULT_AVAILABLE_COLUMNS: RecordingColumn[] = ['timestamp', 'ani', 'duration']
 
+export const SORT_DIRECTIONS = ['asc', 'desc'] as const
+export type SortDirection = typeof SORT_DIRECTIONS[number]
+
+/** Every column sorts; the first click on one goes newest/longest first, or A–Z */
+export const RECORDING_SORT_DEFAULTS: Record<RecordingColumn, SortDirection> = {
+  timestamp: 'desc',
+  ani: 'asc',
+  agent: 'asc',
+  accountNumber: 'asc',
+  duration: 'desc'
+}
+
 /** Keeps known columns in display order, always including timestamp */
 export function normalizeColumns(columns: readonly string[]): RecordingColumn[] {
   return RECORDING_COLUMNS.filter(column => column === 'timestamp' || columns.includes(column))
