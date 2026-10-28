@@ -16,3 +16,10 @@ export const slugSchema = z.string()
 export const roleSchema = z.enum(ROLES)
 
 export const tenantStatusSchema = z.enum(TENANT_STATUSES)
+
+export const supportRequestSchema = z.object({
+  topic: z.enum(SUPPORT_TOPICS),
+  tenantId: z.string().optional(),
+  subject: z.string().trim().min(1, 'Subject is required').max(200),
+  message: z.string().trim().min(10, 'Tell us a little more (at least 10 characters)').max(5000)
+})

@@ -16,17 +16,23 @@ function useSes() {
   return client
 }
 
-export async function sendEmail(to: string, message: EmailMessage) {
+export interface SendEmailOptions {
+  replyTo?: string
+}
+
+export async function sendEmail(to: string, message: EmailMessage, options: SendEmailOptions = {}) {
   const { email } = useRuntimeConfig()
 
   if (email.transport === 'console') {
-    console.info(`\n[email] To: ${to}\n[email] Subject: ${message.subject}\n\n${message.text}\n`)
+    const replyTo = options.replyTo ? `\n[email] Reply-To: ${options.replyTo}` : ''
+    console.info(`\n[email] To: ${to}${replyTo}\n[email] Subject: ${message.subject}\n\n${message.text}\n`)
     return
   }
 
   await useSes().send(new SendEmailCommand({
     FromEmailAddress: email.from,
     Destination: { ToAddresses: [to] },
+    ReplyToAddresses: options.replyTo ? [options.replyTo] : undefined,
     Content: {
       Simple: {
         Subject: { Data: message.subject, Charset: 'UTF-8' },

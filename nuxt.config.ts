@@ -37,6 +37,10 @@ export default defineNuxtConfig({
     aws: {
       region: 'us-east-1'
     },
+    support: {
+      // Where the /support form is delivered
+      email: ''
+    },
     public: {
       appName: 'Insight',
       appUrl: 'http://localhost:3000'

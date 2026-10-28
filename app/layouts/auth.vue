@@ -22,6 +22,12 @@
 
       <div class="mt-6 flex flex-col items-center gap-2">
         <p class="mono-meta">
+          Trouble signing in? <a
+            href="tel:+18002590135"
+            class="hover:text-default"
+          >(800) 259-0135</a>
+        </p>
+        <p class="mono-meta">
           © {{ new Date().getFullYear() }} Answer United, Inc.
         </p>
         <LegalLinks />

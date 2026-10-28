@@ -43,6 +43,7 @@ Insight is the web portal for Answer United customers to access their messages a
    | `NUXT_PUBLIC_APP_URL` | Public URL of the app, used in email links |
    | `NUXT_EMAIL_TRANSPORT` | `ses` to send through AWS SES, or `console` to print emails to the server log |
    | `NUXT_EMAIL_FROM` | Sender address (must be verified in SES) |
+   | `NUXT_SUPPORT_EMAIL` | Address that receives messages from the support form. Replies go to the sender |
    | `NUXT_AWS_REGION` | SES region. Credentials come from the standard AWS chain (env vars, `AWS_PROFILE`, or an IAM role) |
    | `MYSQL_PORT` | Optional host port for the Docker database (default `3306`) |
 

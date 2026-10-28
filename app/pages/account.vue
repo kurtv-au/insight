@@ -384,6 +384,18 @@ async function signOutOtherDevices() {
       </UCard>
     </section>
 
-    <LegalLinks class="mt-12" />
+    <div class="mt-12 flex flex-wrap items-center justify-between gap-3">
+      <NuxtLink
+        to="/support"
+        class="mono-meta inline-flex items-center gap-1.5 hover:text-default"
+      >
+        <UIcon
+          name="i-lucide-life-buoy"
+          class="size-3.5"
+        />
+        Help & support
+      </NuxtLink>
+      <LegalLinks />
+    </div>
   </div>
 </template>
