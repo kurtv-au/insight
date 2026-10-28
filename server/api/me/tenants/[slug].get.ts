@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
 
   const { role } = await requireTenantRole(event, tenant.id, 'viewer')
   return {
-    tenant: { id: tenant.id, slug: tenant.slug, name: tenant.name, status: tenant.status },
+    tenant: { id: tenant.id, slug: tenant.slug, name: tenant.name, status: tenant.status, timezone: tenant.timezone },
     role
   }
 })

@@ -4,6 +4,8 @@ declare module '#auth-utils' {
     email: string
     name: string
     isPlatformAdmin: boolean
+    /** Personal timezone; null follows the account's */
+    timezone: string | null
   }
 
   interface SecureSessionData {

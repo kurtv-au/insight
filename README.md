@@ -96,6 +96,8 @@ Answer United staff are **platform admins**. They create tenants and can access 
 
 **Tenant status.** A new tenant starts in **Setting up** while Answer United configures it. Inviting the owner is optional at creation and can be done later from the admin page. During setup, invitations can be sent and accepted, but only platform admins can open the tenant. **Go live** (from the admin page or the banner inside the tenant) makes it **Active**. Active tenants can be suspended and reactivated. The rule lives in `canOpenTenant()` (`shared/utils/tenants.ts`).
 
+**Timezones.** Each tenant has a timezone (default US/Eastern), set by its owners and admins on the tenant's Settings page. Users can choose their own on their Account page; until they do, they see each tenant's timezone. Pages format dates through `useTimezone()`, which applies that effective timezone. The list of zones is in `shared/utils/timezones.ts` (stored as IANA IDs, shown as US/Eastern, Canada/Pacific, UTC…).
+
 Tenant pages live under `/t/[slug]`, and tenant APIs under `/api/tenants/[tenantId]`. Every tenant API checks the caller's role with `requireTenantRole()` (`server/utils/auth.ts`). Roles are always read from the database, never from the session cookie.
 
 **Sign-in methods.** Password, emailed one-time link or 6-digit code (valid 15 minutes, 5 attempts), and passkeys (WebAuthn, added from the Account page). Sessions are sealed cookies. Changing a password, resetting it, or choosing **Sign out other devices** bumps the user's `sessionVersion`, which invalidates every other session.

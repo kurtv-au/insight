@@ -15,6 +15,13 @@
       "when": 1793202409801,
       "tag": "0001_tenant_setup_status",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1793209321216,
+      "tag": "0002_timezones",
+      "breakpoints": true
     }
   ]
 }

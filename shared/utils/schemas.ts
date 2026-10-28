@@ -23,3 +23,5 @@ export const supportRequestSchema = z.object({
   subject: z.string().trim().min(1, 'Subject is required').max(200),
   message: z.string().trim().min(10, 'Tell us a little more (at least 10 characters)').max(5000)
 })
+
+export const timezoneSchema = z.enum(TIMEZONE_IDS)

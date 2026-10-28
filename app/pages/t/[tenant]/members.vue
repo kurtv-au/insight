@@ -4,6 +4,7 @@ import { z } from 'zod'
 
 const { user } = useUserSession()
 const { tenant, role: myRole, can } = useTenant()
+const { formatDate, formatDateTime } = useTimezone()
 const toast = useToast()
 const confirm = useConfirm()
 useSeoMeta({ title: 'Members' })
@@ -170,7 +171,7 @@ async function onInvite(event: FormSubmitEvent<z.output<typeof inviteSchema>>) {
                 <template v-if="member.name">
                   {{ member.email }} ·
                 </template>
-                last sign-in {{ formatDate(member.lastLoginAt) }}
+                last sign-in {{ formatDateTime(member.lastLoginAt) }}
               </p>
             </div>
             <USelect

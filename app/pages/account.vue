@@ -7,20 +7,25 @@ useSeoMeta({ title: 'Account' })
 const toast = useToast()
 const confirm = useConfirm()
 const { fetch: refreshSession } = useUserSession()
+const { formatDate } = useTimezone()
 const { register, isSupported: passkeySupported } = useWebAuthn()
 
 const { data: me, refresh: refreshMe } = await useFetch('/api/me')
 const { data: passkeys, refresh: refreshPasskeys } = await useFetch('/api/me/passkeys', { default: () => [] })
 
 // Profile
-const profileSchema = z.object({ name: nameSchema })
-const profile = reactive({ name: me.value?.name ?? '' })
+// 'account' stands for no personal timezone, so each account's own applies
+const ACCOUNT_TIMEZONE = 'account' as const
+const profileSchema = z.object({ name: nameSchema, timezone: z.literal(ACCOUNT_TIMEZONE).or(timezoneSchema) })
+const profile = reactive({ name: me.value?.name ?? '', timezone: (me.value?.timezone ?? ACCOUNT_TIMEZONE) as Timezone | typeof ACCOUNT_TIMEZONE })
+const timezoneOptions = [[{ label: 'Account default', value: ACCOUNT_TIMEZONE }], ...timezoneItems()]
 const savingProfile = ref(false)
 
 async function onSaveProfile(event: FormSubmitEvent<z.output<typeof profileSchema>>) {
   savingProfile.value = true
   try {
-    await $fetch('/api/me', { method: 'PATCH', body: event.data })
+    const { timezone, ...rest } = event.data
+    await $fetch('/api/me', { method: 'PATCH', body: { ...rest, timezone: timezone === ACCOUNT_TIMEZONE ? null : timezone } })
     await Promise.all([refreshSession(), refreshMe()])
     toast.add({ title: 'Profile updated', color: 'success' })
   } catch (err) {
@@ -172,6 +177,17 @@ async function signOutOtherDevices() {
           >
             <UInput
               v-model="profile.name"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            label="Timezone"
+            name="timezone"
+            help="Dates and times in Insight are shown in this timezone. Account default uses each account’s own timezone."
+          >
+            <USelect
+              v-model="profile.timezone"
+              :items="timezoneOptions"
               class="w-full"
             />
           </UFormField>

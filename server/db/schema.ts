@@ -13,6 +13,7 @@ import {
 } from 'drizzle-orm/mysql-core'
 import { ROLES } from '../../shared/utils/roles.ts'
 import { TENANT_STATUSES } from '../../shared/utils/tenants.ts'
+import { DEFAULT_TIMEZONE } from '../../shared/utils/timezones.ts'
 
 const id = () => varchar('id', { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID())
 const createdAt = () => datetime('created_at').notNull().$defaultFn(() => new Date())
@@ -23,6 +24,8 @@ export const tenants = mysqlTable('tenants', {
   slug: varchar('slug', { length: 64 }).notNull().unique(),
   name: varchar('name', { length: 255 }).notNull(),
   status: mysqlEnum('status', TENANT_STATUSES).notNull().default('setup'),
+  // IANA timezone that messages and recordings are shown in, unless a user picks their own
+  timezone: varchar('timezone', { length: 64 }).notNull().default(DEFAULT_TIMEZONE),
   createdAt: createdAt(),
   updatedAt: updatedAt()
 })
@@ -38,6 +41,8 @@ export const users = mysqlTable('users', {
   // Incremented to invalidate every existing session for the user
   sessionVersion: int('session_version').notNull().default(1),
   lastLoginAt: datetime('last_login_at'),
+  // Null follows the timezone of the account being viewed
+  timezone: varchar('timezone', { length: 64 }),
   createdAt: createdAt(),
   updatedAt: updatedAt()
 })

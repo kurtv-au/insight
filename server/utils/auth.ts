@@ -6,7 +6,8 @@ export function toSessionUser(user: DbUser) {
     id: user.id,
     email: user.email,
     name: user.name,
-    isPlatformAdmin: user.isPlatformAdmin
+    isPlatformAdmin: user.isPlatformAdmin,
+    timezone: user.timezone
   }
 }
 

@@ -9,18 +9,30 @@ export function safeRedirect(value: unknown, fallback = '/') {
   return typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') ? value : fallback
 }
 
-export function formatDate(value: string | Date | null | undefined) {
+// Pages format through useTimezone(), which passes the viewer's effective timezone.
+// The locale is fixed so the server and browser render the same text.
+
+export function formatDate(value: string | Date | null | undefined, timeZone?: string) {
   if (!value) {
     return '—'
   }
-  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value))
+  return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeZone }).format(new Date(value))
 }
 
-export function formatDateTime(value: string | Date | null | undefined) {
+/** Date and time with the zone abbreviation, e.g. "Oct 28, 2026, 1:30 PM EDT" */
+export function formatDateTime(value: string | Date | null | undefined, timeZone?: string) {
   if (!value) {
     return '—'
   }
-  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
+  return new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZoneName: 'short',
+    timeZone
+  }).format(new Date(value))
 }
 
 export const ROLE_LABELS: Record<Role, string> = {

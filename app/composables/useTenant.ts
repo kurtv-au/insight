@@ -4,6 +4,7 @@ export interface TenantContext {
     slug: string
     name: string
     status: TenantStatus
+    timezone: string
   }
   role: Role
 }

@@ -22,6 +22,7 @@ export default defineEventHandler(async (event) => {
       slug: tables.tenants.slug,
       name: tables.tenants.name,
       status: tables.tenants.status,
+      timezone: tables.tenants.timezone,
       createdAt: tables.tenants.createdAt,
       memberCount: count(tables.memberships.userId),
       ownerCount: sql<number>`cast(coalesce(sum(${tables.memberships.role} = 'owner'), 0) as unsigned)`.mapWith(Number),
