@@ -24,5 +24,5 @@ export function layout(bodyHtml: string) {
 }
 
 export function button(href: string, label: string) {
-  return `<p style="margin:24px 0;"><a href="${escapeHtml(href)}" style="display:inline-block;background:#00a155;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:6px;font-weight:600;">${escapeHtml(label)}</a></p>`
+  return `<p style="margin:24px 0;"><a href="${escapeHtml(href)}" style="display:inline-block;background:#16348c;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:6px;font-weight:600;">${escapeHtml(label)}</a></p>`
 }
