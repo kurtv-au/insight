@@ -24,14 +24,17 @@ const STATUS_ACTIONS: Record<TenantStatus, (tenant: Tenant) => DropdownMenuItem>
   suspended: tenant => ({ label: 'Reactivate', icon: 'i-lucide-play', onSelect: () => setStatus(tenant, 'active') })
 }
 
-function tenantActions(tenant: Tenant): DropdownMenuItem[] {
+function tenantActions(tenant: Tenant): DropdownMenuItem[][] {
   return [
-    { label: 'Open', icon: 'i-lucide-arrow-right', to: `/t/${tenant.slug}` },
-    { label: 'Rename', icon: 'i-lucide-pencil', onSelect: () => openRename(tenant) },
-    ...(tenant.ownerCount === 0
-      ? [{ label: tenant.pendingOwnerInvites ? 'Resend owner invite' : 'Invite owner', icon: 'i-lucide-user-plus', onSelect: () => openInviteOwner(tenant) }]
-      : []),
-    STATUS_ACTIONS[tenant.status](tenant)
+    [
+      { label: 'Open', icon: 'i-lucide-arrow-right', to: `/t/${tenant.slug}` },
+      { label: 'Rename', icon: 'i-lucide-pencil', onSelect: () => openRename(tenant) },
+      ...(tenant.ownerCount === 0
+        ? [{ label: tenant.pendingOwnerInvites ? 'Resend owner invite' : 'Invite owner', icon: 'i-lucide-user-plus', onSelect: () => openInviteOwner(tenant) }]
+        : []),
+      STATUS_ACTIONS[tenant.status](tenant)
+    ],
+    [{ label: 'Delete', icon: 'i-lucide-trash-2', color: 'error', onSelect: () => openDelete(tenant) }]
   ]
 }
 
@@ -121,6 +124,42 @@ async function onRename(event: FormSubmitEvent<z.output<typeof renameSchema>>) {
     toast.add({ title: errorMessage(err), color: 'error' })
   } finally {
     renaming.value = false
+  }
+}
+
+// Delete, confirmed by typing the slug since it can't be undone
+const deleteTenant = ref<Tenant | null>(null)
+const deleteOpen = computed({
+  get: () => !!deleteTenant.value,
+  set: (open) => {
+    if (!open) {
+      deleteTenant.value = null
+    }
+  }
+})
+const deleteConfirmation = ref('')
+const deleting = ref(false)
+
+function openDelete(tenant: Tenant) {
+  deleteConfirmation.value = ''
+  deleteTenant.value = tenant
+}
+
+async function onDelete() {
+  const tenant = deleteTenant.value
+  if (!tenant || deleteConfirmation.value.trim() !== tenant.slug) {
+    return
+  }
+  deleting.value = true
+  try {
+    await $fetch(`/api/admin/tenants/${tenant.id}`, { method: 'DELETE' })
+    toast.add({ title: `${tenant.name} deleted`, color: 'success' })
+    deleteTenant.value = null
+    await Promise.all([refresh(), refreshNuxtData('my-tenants')])
+  } catch (err) {
+    toast.add({ title: errorMessage(err), color: 'error' })
+  } finally {
+    deleting.value = false
   }
 }
 
@@ -360,6 +399,52 @@ async function onInviteOwner(event: FormSubmitEvent<z.output<typeof inviteSchema
             form="rename-tenant-form"
             label="Save"
             :loading="renaming"
+          />
+        </div>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="deleteOpen"
+      :title="deleteTenant ? `Delete ${deleteTenant.name}?` : 'Delete account'"
+      description="This can’t be undone."
+    >
+      <template #body>
+        <form
+          id="delete-tenant-form"
+          class="space-y-4"
+          @submit.prevent="onDelete"
+        >
+          <p class="text-body-sm text-default">
+            Its {{ deleteTenant?.memberCount === 1 ? 'member loses' : `${deleteTenant?.memberCount} members lose` }} access, and its pending invitations, settings and recording account numbers are deleted. People keep their sign-in and any other accounts, and the recordings themselves stay with Answer United.
+          </p>
+          <UFormField
+            :label="`Type ${deleteTenant?.slug} to confirm`"
+            name="confirmation"
+          >
+            <UInput
+              v-model="deleteConfirmation"
+              autocomplete="off"
+              class="w-full"
+            />
+          </UFormField>
+        </form>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton
+            label="Cancel"
+            color="neutral"
+            variant="outline"
+            @click="deleteOpen = false"
+          />
+          <UButton
+            type="submit"
+            form="delete-tenant-form"
+            label="Delete account"
+            color="error"
+            :disabled="deleteConfirmation.trim() !== deleteTenant?.slug"
+            :loading="deleting"
           />
         </div>
       </template>
