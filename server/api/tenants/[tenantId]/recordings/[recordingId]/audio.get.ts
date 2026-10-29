@@ -1,7 +1,7 @@
 // Streams a recording's audio, passing Range requests through so the player can seek
 export default defineEventHandler(async (event) => {
-  const { accountNumbers } = await requireRecordingAccess(event, getRouterParam(event, 'tenantId')!)
-  const recording = await requireTenantRecording(getRouterParam(event, 'recordingId')!, accountNumbers)
+  const access = await requireRecordingAccess(event, getRouterParam(event, 'tenantId')!)
+  const recording = await requireTenantRecording(getRouterParam(event, 'recordingId')!, access)
   const audio = await recordingAudio(recording, getRequestHeader(event, 'range'))
 
   setResponseStatus(event, audio.status)

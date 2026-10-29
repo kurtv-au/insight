@@ -14,6 +14,7 @@ import {
 import { ROLES } from '../../shared/utils/roles.ts'
 import { TENANT_STATUSES } from '../../shared/utils/tenants.ts'
 import { DEFAULT_TIMEZONE } from '../../shared/utils/timezones.ts'
+import { DEFAULT_RECORDING_HISTORY_DAYS } from '../../shared/utils/recordings.ts'
 import type { RecordingColumn } from '../../shared/utils/recordings.ts'
 
 const id = () => varchar('id', { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID())
@@ -31,6 +32,8 @@ export const tenants = mysqlTable('tenants', {
   recordingColumns: json('recording_columns').$type<RecordingColumn[]>(),
   // Columns members see until they choose their own; null means every available column
   recordingDefaultColumns: json('recording_default_columns').$type<RecordingColumn[]>(),
+  // Days of recordings the account can load, counting back from now; set by platform admins
+  recordingHistoryDays: int('recording_history_days').notNull().default(DEFAULT_RECORDING_HISTORY_DAYS),
   createdAt: createdAt(),
   updatedAt: updatedAt()
 })

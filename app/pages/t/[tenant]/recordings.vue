@@ -122,6 +122,9 @@ const searchPlaceholder = computed(() => available.value.includes('ani') ? 'Sear
 
 // Date range
 const todayDate = computed(() => today(timezone.value))
+// The account's history is a rolling window; the server enforces it
+const historyDays = computed(() => config.value?.historyDays ?? DEFAULT_RECORDING_HISTORY_DAYS)
+const earliestDate = computed(() => todayDate.value.subtract({ days: historyDays.value }))
 const presets = computed(() => {
   const t = todayDate.value
   return [
@@ -129,7 +132,7 @@ const presets = computed(() => {
     { label: 'Yesterday', from: t.subtract({ days: 1 }), to: t.subtract({ days: 1 }) },
     { label: 'Last 7 days', from: t.subtract({ days: 6 }), to: t },
     { label: 'Last 30 days', from: t.subtract({ days: 29 }), to: t }
-  ]
+  ].filter(preset => preset.from.compare(earliestDate.value) >= 0)
 })
 const dateOpen = ref(false)
 const shortDate = (date: CalendarDate) => formatDate(date.toDate(timezone.value), timezone.value).replace(/, \d{4}$/, '')
@@ -393,12 +396,17 @@ function changePage(page: number) {
                   @click="setDates()"
                 />
               </div>
-              <UCalendar
-                v-model="calendarRange"
-                range
-                :max-value="todayDate"
-                class="p-2"
-              />
+              <div class="p-2">
+                <UCalendar
+                  v-model="calendarRange"
+                  range
+                  :min-value="earliestDate"
+                  :max-value="todayDate"
+                />
+                <p class="mt-2 px-1 text-body-sm text-muted">
+                  Recordings go back {{ historyDays }} {{ historyDays === 1 ? 'day' : 'days' }}.
+                </p>
+              </div>
             </div>
           </template>
         </UPopover>

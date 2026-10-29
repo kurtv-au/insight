@@ -65,7 +65,7 @@ export async function recordingAudio(recording: Recording, range: string | undef
 
 /**
  * Checks the user can see the tenant's recordings, and loads the tenant's
- * account numbers and column settings.
+ * account numbers, column settings and how far back its history goes.
  */
 export async function requireRecordingAccess(event: H3Event, tenantId: string) {
   const access = await requireTenantRole(event, tenantId, 'viewer')
@@ -77,14 +77,16 @@ export async function requireRecordingAccess(event: H3Event, tenantId: string) {
     ...access,
     accountNumbers: accounts.map(account => account.accountNumber),
     available: normalizeColumns(access.tenant.recordingColumns ?? DEFAULT_AVAILABLE_COLUMNS),
-    accountDefault: access.tenant.recordingDefaultColumns ? normalizeColumns(access.tenant.recordingDefaultColumns) : null
+    accountDefault: access.tenant.recordingDefaultColumns ? normalizeColumns(access.tenant.recordingDefaultColumns) : null,
+    historyDays: access.tenant.recordingHistoryDays,
+    historyStart: recordingHistoryStart(access.tenant.recordingHistoryDays)
   }
 }
 
-/** Loads a recording that belongs to one of the tenant's account numbers, or 404s */
-export async function requireTenantRecording(id: string, accountNumbers: string[]) {
+/** Loads a recording that belongs to one of the tenant's account numbers and is within its history, or 404s */
+export async function requireTenantRecording(id: string, access: { accountNumbers: string[], historyStart: Date }) {
   const recording = await getRecording(id)
-  if (!recording || !accountNumbers.includes(recording.accountNumber)) {
+  if (!recording || !access.accountNumbers.includes(recording.accountNumber) || recording.startedAt < access.historyStart) {
     throw createError({ statusCode: 404, message: 'Recording not found' })
   }
   return recording

@@ -24,6 +24,15 @@ export interface RecordingDto {
 
 export const DEFAULT_AVAILABLE_COLUMNS: RecordingColumn[] = ['timestamp', 'ani', 'duration']
 
+/** How many days of recordings an account can load. Platform admins set it per account. */
+export const DEFAULT_RECORDING_HISTORY_DAYS = 365
+export const MAX_RECORDING_HISTORY_DAYS = 3650
+
+/** The earliest moment an account can load recordings from: a rolling window ending now */
+export function recordingHistoryStart(days: number, now = new Date()) {
+  return new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
+}
+
 export const SORT_DIRECTIONS = ['asc', 'desc'] as const
 export type SortDirection = typeof SORT_DIRECTIONS[number]
 

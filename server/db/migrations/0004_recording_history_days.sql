@@ -1,0 +1,1 @@
+ALTER TABLE `tenants` ADD `recording_history_days` int DEFAULT 365 NOT NULL;

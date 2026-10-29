@@ -13,7 +13,7 @@ const querySchema = z.object({
 })
 
 export default defineEventHandler(async (event) => {
-  const { accountNumbers, available } = await requireRecordingAccess(event, getRouterParam(event, 'tenantId')!)
+  const { accountNumbers, available, historyStart } = await requireRecordingAccess(event, getRouterParam(event, 'tenantId')!)
   const query = await getValidatedQuery(event, querySchema.parse)
 
   // Filters only apply to columns the account can see
@@ -31,10 +31,17 @@ export default defineEventHandler(async (event) => {
     return { items: [], total: 0 }
   }
 
+  // Nothing older than the account's history, whatever range was asked for
+  const from = query.from && new Date(query.from) > historyStart ? new Date(query.from) : historyStart
+  const to = query.to ? new Date(query.to) : undefined
+  if (to && to <= from) {
+    return { items: [], total: 0 }
+  }
+
   const { items, total } = await listRecordings({
     accountNumbers,
-    from: query.from ? new Date(query.from) : undefined,
-    to: query.to ? new Date(query.to) : undefined,
+    from,
+    to,
     callerDigits: callerDigits || undefined,
     accountNumber: query.account,
     minDuration: available.includes('duration') ? query.minDuration : undefined,

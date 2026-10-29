@@ -79,6 +79,28 @@ async function saveAvailableColumns() {
   }
 }
 
+const historyForm = z.object({ recordingHistoryDays: recordingHistoryDaysSchema })
+const history = reactive({ recordingHistoryDays: DEFAULT_RECORDING_HISTORY_DAYS })
+watch(() => recordingConfig.value?.historyDays, (days) => {
+  if (days) {
+    history.recordingHistoryDays = days
+  }
+}, { immediate: true })
+
+const savingHistory = ref(false)
+async function saveHistory(event: FormSubmitEvent<z.output<typeof historyForm>>) {
+  savingHistory.value = true
+  try {
+    await $fetch(`/api/admin/tenants/${tenantId}`, { method: 'PATCH', body: event.data })
+    await refreshRecordingConfig()
+    toast.add({ title: `History set to ${event.data.recordingHistoryDays} ${event.data.recordingHistoryDays === 1 ? 'day' : 'days'}`, color: 'success' })
+  } catch (err) {
+    toast.add({ title: errorMessage(err), color: 'error' })
+  } finally {
+    savingHistory.value = false
+  }
+}
+
 const accountNumberForm = z.object({ accountNumber: accountNumberSchema })
 const newAccount = reactive({ accountNumber: '' })
 const addingAccount = ref(false)
@@ -285,6 +307,32 @@ async function removeAccountNumber(accountNumber: string) {
                 />
               </UForm>
             </div>
+
+            <UForm
+              :schema="historyForm"
+              :state="history"
+              class="space-y-4"
+              @submit="saveHistory"
+            >
+              <UFormField
+                label="History"
+                name="recordingHistoryDays"
+                :help="`Days of recordings this account can load, counting back from now. Default ${DEFAULT_RECORDING_HISTORY_DAYS}.`"
+              >
+                <UInputNumber
+                  v-model="history.recordingHistoryDays"
+                  :min="1"
+                  :max="MAX_RECORDING_HISTORY_DAYS"
+                  :step="1"
+                  class="w-full sm:max-w-40"
+                />
+              </UFormField>
+              <UButton
+                type="submit"
+                label="Save"
+                :loading="savingHistory"
+              />
+            </UForm>
 
             <div class="space-y-4">
               <UFormField
