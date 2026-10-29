@@ -27,6 +27,7 @@ const STATUS_ACTIONS: Record<TenantStatus, (tenant: Tenant) => DropdownMenuItem>
 function tenantActions(tenant: Tenant): DropdownMenuItem[] {
   return [
     { label: 'Open', icon: 'i-lucide-arrow-right', to: `/t/${tenant.slug}` },
+    { label: 'Rename', icon: 'i-lucide-pencil', onSelect: () => openRename(tenant) },
     ...(tenant.ownerCount === 0
       ? [{ label: tenant.pendingOwnerInvites ? 'Resend owner invite' : 'Invite owner', icon: 'i-lucide-user-plus', onSelect: () => openInviteOwner(tenant) }]
       : []),
@@ -79,6 +80,47 @@ async function onCreate(event: FormSubmitEvent<z.output<typeof createSchema>>) {
     toast.add({ title: errorMessage(err), color: 'error' })
   } finally {
     creating.value = false
+  }
+}
+
+// Rename (the slug stays, so links keep working)
+const renameTenant = ref<Tenant | null>(null)
+const renameOpen = computed({
+  get: () => !!renameTenant.value,
+  set: (open) => {
+    if (!open) {
+      renameTenant.value = null
+    }
+  }
+})
+const renameSchema = z.object({ name: nameSchema })
+const renameState = reactive({ name: '' })
+const renaming = ref(false)
+
+function openRename(tenant: Tenant) {
+  renameState.name = tenant.name
+  renameTenant.value = tenant
+}
+
+async function onRename(event: FormSubmitEvent<z.output<typeof renameSchema>>) {
+  const tenant = renameTenant.value
+  if (!tenant) {
+    return
+  }
+  if (event.data.name === tenant.name) {
+    renameTenant.value = null
+    return
+  }
+  renaming.value = true
+  try {
+    await $fetch(`/api/admin/tenants/${tenant.id}`, { method: 'PATCH', body: { name: event.data.name } })
+    toast.add({ title: `${tenant.name} renamed to ${event.data.name}`, color: 'success' })
+    renameTenant.value = null
+    await Promise.all([refresh(), refreshNuxtData('my-tenants')])
+  } catch (err) {
+    toast.add({ title: errorMessage(err), color: 'error' })
+  } finally {
+    renaming.value = false
   }
 }
 
@@ -276,6 +318,48 @@ async function onInviteOwner(event: FormSubmitEvent<z.output<typeof inviteSchema
             form="create-tenant-form"
             :label="createState.ownerEmail ? 'Create and invite owner' : 'Create account'"
             :loading="creating"
+          />
+        </div>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="renameOpen"
+      title="Rename account"
+      :description="renameTenant ? `Members see the new name everywhere. The URL stays /t/${renameTenant.slug}.` : undefined"
+    >
+      <template #body>
+        <UForm
+          id="rename-tenant-form"
+          :schema="renameSchema"
+          :state="renameState"
+          class="space-y-4"
+          @submit="onRename"
+        >
+          <UFormField
+            label="Account name"
+            name="name"
+          >
+            <UInput
+              v-model="renameState.name"
+              class="w-full"
+            />
+          </UFormField>
+        </UForm>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton
+            label="Cancel"
+            color="neutral"
+            variant="outline"
+            @click="renameOpen = false"
+          />
+          <UButton
+            type="submit"
+            form="rename-tenant-form"
+            label="Save"
+            :loading="renaming"
           />
         </div>
       </template>
