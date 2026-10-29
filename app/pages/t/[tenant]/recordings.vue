@@ -39,15 +39,28 @@ function safeDate(value: string | undefined) {
   }
 }
 
-const filters = computed(() => ({
-  q: queryString('q'),
-  from: safeDate(queryString('from')),
-  to: safeDate(queryString('to')),
-  min: Number(queryString('min')) || 0,
-  account: queryString('acct'),
-  page: Math.max(1, Math.floor(Number(queryString('page'))) || 1)
-}))
-const hasFilters = computed(() => !!(filters.value.q || filters.value.from || filters.value.min || filters.value.account))
+// With no dates in the URL the list shows the last 7 days, counting today;
+// "Any time" is range=all
+const DEFAULT_RANGE_DAYS = 7
+const todayDate = computed(() => today(timezone.value))
+function defaultRange() {
+  return { from: todayDate.value.subtract({ days: DEFAULT_RANGE_DAYS - 1 }), to: todayDate.value }
+}
+
+const filters = computed(() => {
+  const from = safeDate(queryString('from'))
+  const to = safeDate(queryString('to'))
+  const anyTime = queryString('range') === 'all'
+  return {
+    q: queryString('q'),
+    ...(from || to ? { from, to } : anyTime ? { from: undefined, to: undefined } : defaultRange()),
+    datesChanged: !!(from || to) || anyTime,
+    min: Number(queryString('min')) || 0,
+    account: queryString('acct'),
+    page: Math.max(1, Math.floor(Number(queryString('page'))) || 1)
+  }
+})
+const hasFilters = computed(() => !!(filters.value.q || filters.value.datesChanged || filters.value.min || filters.value.account))
 
 // Sorting happens on the server. Only shown columns sort, so hiding the sorted
 // column goes back to newest first.
@@ -83,7 +96,7 @@ function updateQuery(patch: QueryPatch, { keepPage = false, replace = false } = 
 
 function clearFilters() {
   search.value = ''
-  updateQuery({ q: undefined, from: undefined, to: undefined, min: undefined, acct: undefined })
+  updateQuery({ q: undefined, from: undefined, to: undefined, range: undefined, min: undefined, acct: undefined })
 }
 
 // Calendar days become instants in the viewer's timezone; `to` is exclusive
@@ -121,7 +134,6 @@ watch(() => filters.value.q, (value) => {
 const searchPlaceholder = computed(() => available.value.includes('ani') ? 'Search caller ID' : '')
 
 // Date range
-const todayDate = computed(() => today(timezone.value))
 // The account's history is a rolling window; the server enforces it
 const historyDays = computed(() => config.value?.historyDays ?? DEFAULT_RECORDING_HISTORY_DAYS)
 const earliestDate = computed(() => todayDate.value.subtract({ days: historyDays.value }))
@@ -155,8 +167,13 @@ const calendarRange = computed({
     }
   }
 })
+// No dates means any time; the default range stays out of the URL
 function setDates(from?: CalendarDate, to?: CalendarDate) {
-  updateQuery({ from: from?.toString(), to: to?.toString() })
+  const { from: defaultFrom, to: defaultTo } = defaultRange()
+  const isDefault = from && to && from.compare(defaultFrom) === 0 && to.compare(defaultTo) === 0
+  updateQuery(from && to && !isDefault
+    ? { from: from.toString(), to: to.toString(), range: undefined }
+    : { from: undefined, to: undefined, range: isDefault ? undefined : 'all' })
   dateOpen.value = false
 }
 
@@ -455,7 +472,7 @@ function changePage(page: number) {
           :meta="tableMeta"
           :loading="loading"
           :get-row-id="(row: RecordingDto) => row.id"
-          :empty="hasFilters ? 'No recordings match these filters.' : 'No recordings yet.'"
+          :empty="hasFilters ? 'No recordings match these filters.' : `No recordings in the last ${DEFAULT_RANGE_DAYS} days.`"
           @select="(_e: Event, row: { original: RecordingDto }) => openRecording(row.original)"
         />
       </UCard>
