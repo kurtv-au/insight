@@ -44,7 +44,7 @@ const accountMenu = computed<DropdownMenuItem[][]>(() => [
 ])
 
 const tileClass = 'relative grid size-11 place-items-center rounded-subtle border text-muted transition-[color,background-color,border-color,transform] duration-[140ms] ease-ink border-default bg-sidebar hover:border-accented hover:bg-rail-hover hover:text-default hover:-translate-y-px'
-const activeClass = 'text-primary! bg-rail-active! border-default translate-y-0! shadow-[inset_0_2px_6px_rgba(0,0,0,0.12)] dark:shadow-[inset_0_2px_6px_rgba(0,0,0,0.55)]'
+const activeClass = 'text-primary! bg-rail-active! border-primary! translate-y-0! dark:shadow-[inset_0_2px_6px_rgba(0,0,0,0.55)]'
 
 function itemClass(item: AppNavItem) {
   return [tileClass, isActive(item) && activeClass]

@@ -40,8 +40,10 @@ const inkWidth = computed(() => {
         :aria-label="stop.label"
       >
         <span
-          class="grid size-11 place-items-center rounded-subtle bg-muted text-muted ring-1 ring-muted transition-[color,background-color,transform] duration-[140ms] ease-ink"
-          :class="i === activeIndex && 'bg-rail-active text-primary shadow-[inset_0_2px_6px_rgba(0,0,0,0.25)] dark:shadow-[inset_0_2px_6px_rgba(0,0,0,0.55)]'"
+          class="grid size-11 place-items-center rounded-subtle ring-1 transition-[color,background-color,transform] duration-[140ms] ease-ink"
+          :class="i === activeIndex
+            ? 'bg-rail-active text-primary ring-primary dark:shadow-[inset_0_2px_6px_rgba(0,0,0,0.55)]'
+            : 'bg-muted text-muted ring-muted'"
         >
           <UIcon
             :name="stop.icon"
