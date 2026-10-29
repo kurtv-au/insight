@@ -3,13 +3,12 @@
  * to an account, owners and admins choose the account's defaults, and each user
  * picks their own from the available ones. Timestamp is always shown.
  */
-export const RECORDING_COLUMNS = ['timestamp', 'ani', 'agent', 'accountNumber', 'duration'] as const
+export const RECORDING_COLUMNS = ['timestamp', 'ani', 'accountNumber', 'duration'] as const
 export type RecordingColumn = typeof RECORDING_COLUMNS[number]
 
 export const RECORDING_COLUMN_LABELS: Record<RecordingColumn, string> = {
   timestamp: 'Timestamp',
   ani: 'Caller ID',
-  agent: 'Agent',
   accountNumber: 'Account #',
   duration: 'Duration'
 }
@@ -19,7 +18,6 @@ export interface RecordingDto {
   id: string
   startedAt: string
   ani?: string | null
-  agent?: string
   accountNumber?: string
   durationSeconds?: number
 }
@@ -33,7 +31,6 @@ export type SortDirection = typeof SORT_DIRECTIONS[number]
 export const RECORDING_SORT_DEFAULTS: Record<RecordingColumn, SortDirection> = {
   timestamp: 'desc',
   ani: 'asc',
-  agent: 'asc',
   accountNumber: 'asc',
   duration: 'desc'
 }

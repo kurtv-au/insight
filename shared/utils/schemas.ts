@@ -28,6 +28,8 @@ export const timezoneSchema = z.enum(TIMEZONE_IDS)
 
 export const recordingColumnsSchema = z.array(z.enum(RECORDING_COLUMNS)).max(RECORDING_COLUMNS.length)
 
+/** A recording account number is a client number in the recordings API: digits, no leading zeros */
 export const accountNumberSchema = z.string()
   .trim()
-  .regex(/^[A-Za-z0-9-]{1,32}$/, 'Use up to 32 letters, numbers and hyphens')
+  .regex(/^\d{1,10}$/, 'Use up to 10 digits')
+  .transform(value => String(Number(value)))

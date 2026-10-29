@@ -118,10 +118,7 @@ watch(() => filters.value.q, (value) => {
     search.value = value ?? ''
   }
 })
-const searchPlaceholder = computed(() => {
-  const parts = [available.value.includes('ani') && 'caller ID', available.value.includes('agent') && 'agent'].filter(Boolean)
-  return parts.length ? `Search ${parts.join(' or ')}` : ''
-})
+const searchPlaceholder = computed(() => available.value.includes('ani') ? 'Search caller ID' : '')
 
 // Date range
 const todayDate = computed(() => today(timezone.value))
@@ -244,11 +241,6 @@ const COLUMN_DEFS: Record<RecordingColumn, TableColumn<RecordingDto>> = {
     id: 'ani',
     header: () => sortHeader('ani'),
     cell: ({ row }) => h('span', { class: ['whitespace-nowrap tabular-nums', !row.original.ani && 'text-muted'] }, formatPhone(row.original.ani))
-  },
-  agent: {
-    id: 'agent',
-    header: () => sortHeader('agent'),
-    cell: ({ row }) => row.original.agent
   },
   accountNumber: {
     id: 'accountNumber',

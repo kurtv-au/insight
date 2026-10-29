@@ -28,7 +28,6 @@ const details = computed(() => {
   return [
     { label: RECORDING_COLUMN_LABELS.timestamp, value: formatDateTime(r.startedAt) },
     r.ani !== undefined && { label: RECORDING_COLUMN_LABELS.ani, value: formatPhone(r.ani) },
-    r.agent !== undefined && { label: RECORDING_COLUMN_LABELS.agent, value: r.agent },
     r.accountNumber !== undefined && { label: RECORDING_COLUMN_LABELS.accountNumber, value: r.accountNumber },
     r.durationSeconds !== undefined && { label: RECORDING_COLUMN_LABELS.duration, value: formatDuration(r.durationSeconds) }
   ].filter(item => !!item)
@@ -55,7 +54,6 @@ const details = computed(() => {
         <RecordingPlayer
           :key="recording.id"
           :src="`${recordingUrl}/audio`"
-          :waveform-src="`${recordingUrl}/waveform`"
           autoplay
         />
 

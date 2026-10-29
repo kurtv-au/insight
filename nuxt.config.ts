@@ -41,6 +41,11 @@ export default defineNuxtConfig({
       // Where the /support form is delivered
       email: ''
     },
+    // The recordings API (au-api /v1). Without a key, development uses mock recordings.
+    auApi: {
+      url: 'https://api.answerunited.net',
+      key: ''
+    },
     public: {
       appName: 'Insight',
       appUrl: 'http://localhost:3000'

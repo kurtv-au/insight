@@ -24,14 +24,18 @@ export default defineEventHandler(async (event) => {
   if (!available.includes(query.sort)) {
     throw createError({ statusCode: 400, message: 'Can’t sort by that column' })
   }
+  // Search matches caller IDs by their digits, so it needs that column and some
+  // digits; no phone number has more than 15
+  const callerDigits = query.q?.replace(/\D/g, '')
+  if (query.q && (!available.includes('ani') || !callerDigits || callerDigits.length > 15)) {
+    return { items: [], total: 0 }
+  }
 
   const { items, total } = await listRecordings({
     accountNumbers,
     from: query.from ? new Date(query.from) : undefined,
     to: query.to ? new Date(query.to) : undefined,
-    search: query.q || undefined,
-    searchAni: available.includes('ani'),
-    searchAgent: available.includes('agent'),
+    callerDigits: callerDigits || undefined,
     accountNumber: query.account,
     minDuration: available.includes('duration') ? query.minDuration : undefined,
     sort: query.sort,

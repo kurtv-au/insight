@@ -271,6 +271,7 @@ async function removeAccountNumber(accountNumber: string) {
                     v-model="newAccount.accountNumber"
                     placeholder="Account number"
                     aria-label="Account number"
+                    inputmode="numeric"
                     class="w-full"
                   />
                 </UFormField>
