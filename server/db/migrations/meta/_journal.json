@@ -36,6 +36,13 @@
       "when": 1793301606493,
       "tag": "0004_recording_history_days",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1793660650581,
+      "tag": "0005_message_fields",
+      "breakpoints": true
     }
   ]
 }

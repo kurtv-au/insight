@@ -137,36 +137,6 @@ const searchPlaceholder = computed(() => available.value.includes('ani') ? 'Sear
 // The account's history is a rolling window; the server enforces it
 const historyDays = computed(() => config.value?.historyDays ?? DEFAULT_RECORDING_HISTORY_DAYS)
 const earliestDate = computed(() => todayDate.value.subtract({ days: historyDays.value }))
-const presets = computed(() => {
-  const t = todayDate.value
-  return [
-    { label: 'Today', from: t, to: t },
-    { label: 'Yesterday', from: t.subtract({ days: 1 }), to: t.subtract({ days: 1 }) },
-    { label: 'Last 7 days', from: t.subtract({ days: 6 }), to: t },
-    { label: 'Last 30 days', from: t.subtract({ days: 29 }), to: t }
-  ].filter(preset => preset.from.compare(earliestDate.value) >= 0)
-})
-const dateOpen = ref(false)
-const shortDate = (date: CalendarDate) => formatDate(date.toDate(timezone.value), timezone.value).replace(/, \d{4}$/, '')
-const dateLabel = computed(() => {
-  const { from, to } = filters.value
-  if (!from || !to) {
-    return 'Any time'
-  }
-  const preset = presets.value.find(p => p.from.compare(from) === 0 && p.to.compare(to) === 0)
-  if (preset) {
-    return preset.label
-  }
-  return from.compare(to) === 0 ? shortDate(from) : `${shortDate(from)} – ${shortDate(to)}`
-})
-const calendarRange = computed({
-  get: () => ({ start: filters.value.from, end: filters.value.to }),
-  set: (range: { start?: CalendarDate, end?: CalendarDate } | null) => {
-    if (range?.start && range.end) {
-      setDates(range.start, range.end)
-    }
-  }
-})
 // No dates means any time; the default range stays out of the URL
 function setDates(from?: CalendarDate, to?: CalendarDate) {
   const { from: defaultFrom, to: defaultTo } = defaultRange()
@@ -174,7 +144,6 @@ function setDates(from?: CalendarDate, to?: CalendarDate) {
   updateQuery(from && to && !isDefault
     ? { from: from.toString(), to: to.toString(), range: undefined }
     : { from: undefined, to: undefined, range: isDefault ? undefined : 'all' })
-  dateOpen.value = false
 }
 
 const durationItems = [
@@ -382,51 +351,14 @@ function changePage(page: number) {
           :aria-label="searchPlaceholder"
         />
 
-        <UPopover
-          v-model:open="dateOpen"
-          :content="{ align: 'start' }"
-        >
-          <UButton
-            :label="dateLabel"
-            icon="i-lucide-calendar"
-            trailing-icon="i-lucide-chevron-down"
-            color="neutral"
-            variant="outline"
-          />
-          <template #content>
-            <div class="flex flex-col sm:flex-row">
-              <div class="flex flex-row flex-wrap gap-1 border-b border-default p-2 sm:flex-col sm:border-r sm:border-b-0">
-                <UButton
-                  v-for="preset in presets"
-                  :key="preset.label"
-                  :label="preset.label"
-                  color="neutral"
-                  :variant="dateLabel === preset.label ? 'soft' : 'ghost'"
-                  size="sm"
-                  @click="setDates(preset.from, preset.to)"
-                />
-                <UButton
-                  label="Any time"
-                  color="neutral"
-                  :variant="dateLabel === 'Any time' ? 'soft' : 'ghost'"
-                  size="sm"
-                  @click="setDates()"
-                />
-              </div>
-              <div class="p-2">
-                <UCalendar
-                  v-model="calendarRange"
-                  range
-                  :min-value="earliestDate"
-                  :max-value="todayDate"
-                />
-                <p class="mt-2 px-1 text-body-sm text-muted">
-                  Recordings go back {{ historyDays }} {{ historyDays === 1 ? 'day' : 'days' }}.
-                </p>
-              </div>
-            </div>
-          </template>
-        </UPopover>
+        <DateRangeFilter
+          :from="filters.from"
+          :to="filters.to"
+          :timezone="timezone"
+          :earliest="earliestDate"
+          :note="`Recordings go back ${historyDays} ${historyDays === 1 ? 'day' : 'days'}.`"
+          @change="setDates"
+        />
 
         <USelect
           v-if="available.includes('duration')"

@@ -1,7 +1,7 @@
 {
   "name": "insight",
   "version": "2.0.0",
-  "description": "Insight — the Answer United customer portal for accessing messages and call recordings.",
+  "description": "Insight \u2014 the Answer United customer portal for accessing messages and call recordings.",
   "author": "Answer United, Inc.",
   "license": "Proprietary",
   "private": true,
@@ -13,6 +13,7 @@
     "postinstall": "nuxt prepare",
     "lint": "eslint .",
     "typecheck": "nuxt typecheck",
+    "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
@@ -26,19 +27,23 @@
     "@nuxt/ui": "^4.12.0",
     "@simplewebauthn/browser": "^11.0.0",
     "@simplewebauthn/server": "^11.0.0",
+    "@vueuse/integrations": "^14.4.0",
     "drizzle-orm": "^0.45.4",
     "mysql2": "^3.24.6",
     "nuxt": "^4.6.2",
     "nuxt-auth-utils": "^0.5.32",
+    "sortablejs": "^1.15.7",
     "tailwindcss": "^4.3.3",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@nuxt/eslint": "^1.17.0",
+    "@types/sortablejs": "^1.15.9",
     "drizzle-kit": "^0.31.11",
     "eslint": "^10.13.0",
     "eslint-plugin-better-tailwindcss": "^4.10.0",
     "typescript": "^6.0.3",
+    "vitest": "^5.0.5",
     "vue-tsc": "^3.3.13"
   },
   "packageManager": "pnpm@12.15.0"

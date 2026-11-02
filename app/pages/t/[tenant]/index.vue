@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const { tenant } = useTenant()
+const { user } = useUserSession()
 useSeoMeta({ title: () => tenant.value?.name ?? 'Dashboard' })
 </script>
 
@@ -31,7 +32,32 @@ useSeoMeta({ title: () => tenant.value?.name ?? 'Dashboard' })
             class="mt-1 size-4 text-muted transition-transform duration-[140ms] group-hover:translate-x-0.5 group-hover:text-primary"
           />
         </NuxtLink>
-        <div class="flex items-start gap-4 rounded-standard border border-default bg-muted p-[22px]">
+        <NuxtLink
+          v-if="user?.isPlatformAdmin"
+          :to="`/t/${tenant?.slug}/messages`"
+          class="group flex items-start gap-4 rounded-standard border border-default bg-muted p-[22px] transition-colors hover:border-accented"
+        >
+          <IconTile icon="i-lucide-message-square" />
+          <div class="min-w-0 flex-1">
+            <p class="font-display text-[19px] font-semi text-highlighted decoration-primary decoration-2 underline-offset-[5px] group-hover:underline">
+              Messages
+            </p>
+            <p class="mt-1 text-body-sm text-muted">
+              Messages taken on your behalf.
+            </p>
+            <AsideNote class="mt-2">
+              Visible to Answer United only while it’s set up.
+            </AsideNote>
+          </div>
+          <UIcon
+            name="i-lucide-arrow-right"
+            class="mt-1 size-4 text-muted transition-transform duration-[140ms] group-hover:translate-x-0.5 group-hover:text-primary"
+          />
+        </NuxtLink>
+        <div
+          v-else
+          class="flex items-start gap-4 rounded-standard border border-default bg-muted p-[22px]"
+        >
           <IconTile icon="i-lucide-message-square" />
           <div class="min-w-0">
             <p class="font-display text-[19px] font-semi text-highlighted">

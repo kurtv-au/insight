@@ -29,6 +29,7 @@ function tenantActions(tenant: Tenant): DropdownMenuItem[][] {
     [
       { label: 'Open', icon: 'i-lucide-arrow-right', to: `/t/${tenant.slug}` },
       { label: 'Rename', icon: 'i-lucide-pencil', onSelect: () => openRename(tenant) },
+      { label: 'Message fields', icon: 'i-lucide-list-checks', to: `/admin/tenants/${tenant.id}/message-fields` },
       ...(tenant.ownerCount === 0
         ? [{ label: tenant.pendingOwnerInvites ? 'Resend owner invite' : 'Invite owner', icon: 'i-lucide-user-plus', onSelect: () => openInviteOwner(tenant) }]
         : []),

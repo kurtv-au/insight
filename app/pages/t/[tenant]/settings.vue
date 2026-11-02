@@ -32,6 +32,21 @@ async function onSave(event: FormSubmitEvent<z.output<typeof schema>>) {
   }
 }
 
+// Message fields, set up by platform admins on their own page
+const { data: messageSetup } = await useFetch(`/api/admin/tenants/${tenantId}/message-fields`, {
+  immediate: !!user.value?.isPlatformAdmin
+})
+const messageSetupSummary = computed(() => {
+  const setup = messageSetup.value
+  if (!setup?.fields.length) {
+    return 'No message fields yet, so the messages page isn’t set up.'
+  }
+  const count = `${setup.fields.length} ${setup.fields.length === 1 ? 'field' : 'fields'}`
+  const source = setup.settings.scriptAccountNumber ? ` from account ${setup.settings.scriptAccountNumber}’s script` : ''
+  const orphaned = setup.fields.filter(field => field.orphaned).length
+  return `${count}${source}.${orphaned ? ` ${orphaned} no longer in the script.` : ''}`
+})
+
 // Recording columns
 const { data: recordingConfig, refresh: refreshRecordingConfig } = await useFetch(`/api/tenants/${tenantId}/recordings/config`, {
   immediate: can('admin')
@@ -351,6 +366,50 @@ async function removeAccountNumber(accountNumber: string) {
                 @click="saveAvailableColumns"
               />
             </div>
+          </div>
+        </UCard>
+      </section>
+
+      <section
+        v-if="user?.isPlatformAdmin"
+        class="mt-10"
+      >
+        <SectionKicker
+          number="04"
+          label="Message setup"
+          class="mb-3"
+        />
+        <UCard>
+          <template #header>
+            <div class="flex items-center gap-2">
+              <UBadge
+                label="Answer United only"
+                color="neutral"
+                variant="subtle"
+                icon="i-lucide-shield"
+              />
+              <p class="text-body-sm text-muted">
+                Customers don’t see this section.
+              </p>
+            </div>
+          </template>
+
+          <div class="flex flex-wrap items-center justify-between gap-4">
+            <div class="min-w-0">
+              <p class="text-sm font-medium text-default">
+                Message fields
+              </p>
+              <p class="mt-1 text-body-sm text-muted">
+                {{ messageSetupSummary }}
+              </p>
+            </div>
+            <UButton
+              label="Configure message fields"
+              icon="i-lucide-list-checks"
+              color="neutral"
+              variant="outline"
+              :to="`/admin/tenants/${tenantId}/message-fields`"
+            />
           </div>
         </UCard>
       </section>

@@ -19,6 +19,8 @@ export function useAppNav() {
     const base = `/t/${tenant.value.slug}`
     return [
       { icon: 'i-lucide-layout-dashboard', label: 'Dashboard', to: base, exact: true },
+      // Platform admins only until messages have real data behind them
+      ...(user.value?.isPlatformAdmin ? [{ icon: 'i-lucide-message-square', label: 'Messages', to: `${base}/messages` }] : []),
       { icon: 'i-lucide-audio-lines', label: 'Recordings', to: `${base}/recordings` },
       ...(can('admin')
         ? [

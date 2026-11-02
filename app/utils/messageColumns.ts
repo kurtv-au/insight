@@ -1,0 +1,68 @@
+import type { TableColumn } from '@nuxt/ui'
+
+/**
+ * Table columns for messages, built from a tenant's configured fields. The
+ * messages page and the admin preview both use this, so the preview is exactly
+ * what the account will see.
+ */
+export function buildMessageColumns(
+  fields: readonly MessageColumnField[],
+  options: { timeZone: string, received?: boolean }
+): TableColumn<MessageRow>[] {
+  const columns: TableColumn<MessageRow>[] = []
+
+  if (options.received !== false) {
+    columns.push({
+      id: 'createdAt',
+      header: 'Received',
+      cell: ({ row }) => h('span', { class: 'whitespace-nowrap tabular-nums' }, formatDateTime(row.original.createdAt, options.timeZone))
+    })
+  }
+
+  for (const field of listFields(fields)) {
+    const numeric = field.type === 'number' || field.type === 'currency'
+    columns.push({
+      id: `field:${field.fieldKey}`,
+      header: field.label,
+      cell: ({ row }) => messageCell(row.original.fields[field.fieldKey], field, options.timeZone, 'list'),
+      meta: numeric ? { class: { th: 'text-right', td: 'text-right' } } : undefined
+    })
+  }
+  return columns
+}
+
+/** One formatted value, as a list cell or in the detail view */
+export function messageCell(
+  value: MessageFieldValue | undefined,
+  field: Pick<MessageColumnField, 'type' | 'format'>,
+  timeZone: string,
+  context: 'list' | 'detail'
+) {
+  const text = formatFieldValue(value, field.type, field.format, { timeZone, context })
+  if (text === '—') {
+    return h('span', { 'class': 'text-dimmed', 'aria-label': 'Empty' }, text)
+  }
+  if (field.type === 'email' && (field.format as MessageFieldFormats['email']).link && /^[^\s@]+@[^\s@]+$/.test(text)) {
+    return h('a', {
+      href: `mailto:${text}`,
+      class: 'text-primary hover:underline',
+      // The row opens the message; the link shouldn't do both
+      onClick: (event: Event) => event.stopPropagation()
+    }, text)
+  }
+  const classes = {
+    number: 'tabular-nums whitespace-nowrap',
+    currency: 'tabular-nums whitespace-nowrap',
+    phone: 'tabular-nums whitespace-nowrap',
+    date: 'whitespace-nowrap',
+    time: 'whitespace-nowrap',
+    datetime: 'whitespace-nowrap',
+    longText: context === 'list' ? 'block max-w-xs truncate' : 'whitespace-pre-line',
+    text: '',
+    email: '',
+    boolean: '',
+    select: ''
+  }[field.type]
+  const full = context === 'list' && field.type === 'longText' && typeof value === 'string' ? value : undefined
+  return h('span', { class: classes, title: full }, text)
+}

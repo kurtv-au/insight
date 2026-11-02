@@ -30,19 +30,8 @@ const SORT_FIELDS: Record<RecordingColumn, string> = {
 /** The API defaults to the last 30 days, so "any time" needs an explicit start */
 const EARLIEST = '2000-01-01T00:00:00.000Z'
 
-async function auApi<T>(path: string, query?: Record<string, string | number | undefined>) {
-  const { url, key } = useRuntimeConfig().auApi
-  try {
-    return await $fetch<T>(path, { baseURL: url, query, headers: { Authorization: `Bearer ${key}` } })
-  } catch (err) {
-    const status = (err as { statusCode?: number }).statusCode
-    if (status === 404) {
-      return null
-    }
-    // Only the status: the error's request details include the key header
-    console.error(`[recordings] au-api ${path} failed:`, status ?? (err as Error).message)
-    throw createError({ statusCode: 503, message: 'Recordings aren’t available right now' })
-  }
+function auApi<T>(path: string, query?: Record<string, string | number | undefined>) {
+  return auApiGet<T>(path, query, { tag: 'recordings', unavailableMessage: 'Recordings aren’t available right now' })
 }
 
 function toRecording(row: ApiRecording): Recording {

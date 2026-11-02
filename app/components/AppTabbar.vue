@@ -9,6 +9,9 @@ const stops = computed<AppNavItem[]>(() => [
   { icon: 'i-lucide-circle-user-round', label: 'Account', to: '/account' }
 ])
 
+// Stops share the bar, up to 66px each, so a platform admin's extra items still fit a narrow phone
+const stopWidth = computed(() => `min(66px, calc((100vw - 24px) / ${stops.value.length}))`)
+
 const activeIndex = computed(() => stops.value.findIndex(isActive))
 
 const inkWidth = computed(() => {
@@ -36,7 +39,8 @@ const inkWidth = computed(() => {
         v-for="(stop, i) in stops"
         :key="stop.to"
         :to="stop.to"
-        class="relative flex min-h-11 w-[min(66px,18vw)] flex-col items-center justify-center"
+        class="relative flex min-h-11 flex-col items-center justify-center"
+        :style="{ width: stopWidth }"
         :aria-label="stop.label"
       >
         <span
