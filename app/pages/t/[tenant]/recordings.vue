@@ -39,12 +39,11 @@ function safeDate(value: string | undefined) {
   }
 }
 
-// With no dates in the URL the list shows the last 7 days, counting today;
+// With no dates in the URL the list shows today (quick to load from au-api);
 // "Any time" is range=all
-const DEFAULT_RANGE_DAYS = 7
 const todayDate = computed(() => today(timezone.value))
 function defaultRange() {
-  return { from: todayDate.value.subtract({ days: DEFAULT_RANGE_DAYS - 1 }), to: todayDate.value }
+  return { from: todayDate.value, to: todayDate.value }
 }
 
 const filters = computed(() => {
@@ -112,11 +111,17 @@ const apiQuery = computed(() => ({
   dir: sort.value.direction
 }))
 
-const { data: results, status } = await useFetch(api, {
+// au-api can be slow, so the page opens straight away and the list loads in
+// the browser afterwards, with a loader meanwhile (as on the messages page)
+const { data: results, status, error: loadError, refresh } = useFetch(api, {
   query: apiQuery,
+  lazy: true,
+  server: false,
+  immediate: !!config.value?.hasAccountNumbers,
   default: () => ({ items: [] as RecordingDto[], total: 0 })
 })
-const loading = computed(() => status.value === 'pending')
+// 'idle' is the server render and the moment before the browser's first request
+const loading = computed(() => !!config.value?.hasAccountNumbers && (status.value === 'pending' || status.value === 'idle'))
 const pageCount = computed(() => Math.max(1, Math.ceil(results.value.total / PAGE_SIZE)))
 
 // Search, debounced so each keystroke doesn't add a request or history entry
@@ -263,8 +268,9 @@ watch(() => results.value.items[selectedIndex.value], (recording) => {
     linkedRecording.value = recording
   }
 })
-watch([selectedId, selectedIndex], async ([id, index]) => {
-  if (id && index === -1 && linkedRecording.value?.id !== id) {
+// Waits for the list, which usually has it
+watch([selectedId, selectedIndex, loading], async ([id, index, listLoading]) => {
+  if (id && index === -1 && !listLoading && linkedRecording.value?.id !== id) {
     try {
       linkedRecording.value = await requestFetch<RecordingDto>(`${api}/${encodeURIComponent(id)}`)
     } catch (err) {
@@ -388,8 +394,26 @@ function changePage(page: number) {
         />
       </div>
 
-      <p class="mono-meta mt-6">
-        {{ results.total.toLocaleString('en-US') }} {{ results.total === 1 ? 'recording' : 'recordings' }}<template v-if="pageCount > 1">
+      <UAlert
+        v-if="loadError && !loading"
+        class="mt-6"
+        color="error"
+        variant="subtle"
+        icon="i-lucide-circle-alert"
+        :title="errorMessage(loadError, 'Couldn’t load recordings')"
+        description="Your filters are kept. Try again in a moment."
+        :actions="[{ label: 'Try again', color: 'neutral', variant: 'outline', icon: 'i-lucide-refresh-cw', onClick: () => refresh() }]"
+      />
+
+      <p
+        v-else
+        class="mono-meta mt-6"
+      >
+        <template v-if="loading">
+          Loading recordings…
+        </template><template v-else>
+          {{ results.total.toLocaleString('en-US') }} {{ results.total === 1 ? 'recording' : 'recordings' }}
+        </template><template v-if="!loading && pageCount > 1">
           · page {{ filters.page }} of {{ pageCount }}
         </template>
       </p>
@@ -404,9 +428,13 @@ function changePage(page: number) {
           :meta="tableMeta"
           :loading="loading"
           :get-row-id="(row: RecordingDto) => row.id"
-          :empty="hasFilters ? 'No recordings match these filters.' : `No recordings in the last ${DEFAULT_RANGE_DAYS} days.`"
+          :empty="loadError ? 'Recordings couldn’t be loaded.' : hasFilters ? 'No recordings match these filters.' : 'No recordings today.'"
           @select="(_e: Event, row: { original: RecordingDto }) => openRecording(row.original)"
-        />
+        >
+          <template #loading>
+            <TableLoading label="Loading recordings…" />
+          </template>
+        </UTable>
       </UCard>
 
       <div

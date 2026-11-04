@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_MESSAGE_FIELD_FORMATS,
+  isRetrievableFieldKey,
   messageFieldConfigInputSchema,
   messageFieldSchema
 } from '../../shared/utils/messageFields'
@@ -128,5 +129,30 @@ describe('messageFieldConfigInputSchema', () => {
   it('rejects more than 200 fields', () => {
     const fields = Array.from({ length: 201 }, (_, i) => field({ fieldKey: `F${i}`, order: i }))
     expect(messageFieldConfigInputSchema.safeParse(config(fields)).success).toBe(false)
+  })
+
+  it('accepts 50 active fields, with any number inactive', () => {
+    const fields = Array.from({ length: 80 }, (_, i) => field({ fieldKey: `F${i}`, order: i, isActive: i < 50 }))
+    expect(messageFieldConfigInputSchema.safeParse(config(fields)).success).toBe(true)
+  })
+
+  it('rejects more than 50 active fields, since au-api returns at most 50', () => {
+    const fields = Array.from({ length: 51 }, (_, i) => field({ fieldKey: `F${i}`, order: i }))
+    const result = messageFieldConfigInputSchema.safeParse(config(fields))
+    expect(issues(result).map(issue => issue.message)).toContain('Messages can show at most 50 fields; turn some off')
+  })
+})
+
+describe('isRetrievableFieldKey', () => {
+  it('accepts the names au-api /v1/messages accepts', () => {
+    for (const key of ['Phone', 'caller_name', '_x', 'A.b-c', 'x'.repeat(64)]) {
+      expect(isRetrievableFieldKey(key), key).toBe(true)
+    }
+  })
+
+  it('rejects names au-api would refuse', () => {
+    for (const key of ['', '1st', '__internal', 'Caller Name', 'a,b', 'é', 'x'.repeat(65)]) {
+      expect(isRetrievableFieldKey(key), key).toBe(false)
+    }
   })
 })

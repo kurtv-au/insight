@@ -102,6 +102,18 @@ const labelId = useId()
             size="sm"
             icon="i-lucide-triangle-alert"
           />
+          <UTooltip
+            v-if="!isRetrievableFieldKey(field.fieldKey)"
+            text="Messages can only load fields whose name starts with a letter or _ and uses letters, digits, _ . or -. This one will show as empty."
+          >
+            <UBadge
+              label="Can’t be loaded"
+              color="warning"
+              variant="subtle"
+              size="sm"
+              icon="i-lucide-triangle-alert"
+            />
+          </UTooltip>
           <UBadge
             v-if="!field.isActive"
             label="Inactive"

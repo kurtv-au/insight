@@ -32,27 +32,49 @@ function safeDate(value: string | undefined) {
   }
 }
 
-// With no dates in the URL the list shows the last 7 days, counting today; "Any time" is range=all
-const DEFAULT_RANGE_DAYS = 7
+// au-api reads at most a week at a time, so a range is at most 7 days and there's
+// no "Any time". With no dates in the URL the list shows today, which loads quickest.
+const maxRangeDays = computed(() => config.value?.maxRangeDays ?? MAX_MESSAGE_RANGE_DAYS)
+const historyDays = computed(() => config.value?.historyDays ?? DEFAULT_RECORDING_HISTORY_DAYS)
 const todayDate = computed(() => today(timezone.value))
+const earliestDate = computed(() => todayDate.value.subtract({ days: historyDays.value }))
 function defaultRange() {
-  return { from: todayDate.value.subtract({ days: DEFAULT_RANGE_DAYS - 1 }), to: todayDate.value }
+  return { from: todayDate.value, to: todayDate.value }
+}
+
+/** Dates from the URL, made into a range the API accepts: within history, no longer than the maximum */
+function urlRange(from: CalendarDate | undefined, to: CalendarDate | undefined) {
+  if (!from && !to) {
+    return undefined
+  }
+  const span = maxRangeDays.value - 1
+  let end = to ?? from!.add({ days: span })
+  if (end.compare(todayDate.value) > 0) {
+    end = todayDate.value
+  }
+  let start = from ?? end.subtract({ days: span })
+  if (end.compare(start) > span) {
+    start = end.subtract({ days: span })
+  }
+  if (start.compare(earliestDate.value) < 0) {
+    start = earliestDate.value
+  }
+  if (end.compare(start) < 0) {
+    end = start
+  }
+  return { from: start, to: end }
 }
 
 const filters = computed(() => {
-  const from = safeDate(queryString('from'))
-  const to = safeDate(queryString('to'))
-  const anyTime = queryString('range') === 'all'
+  const range = urlRange(safeDate(queryString('from')), safeDate(queryString('to')))
   return {
     q: queryString('q'),
-    ...(from || to ? { from, to } : anyTime ? { from: undefined, to: undefined } : defaultRange()),
-    datesChanged: !!(from || to) || anyTime,
+    ...(range ?? defaultRange()),
+    datesChanged: !!range,
     page: Math.max(1, Math.floor(Number(queryString('page'))) || 1)
   }
 })
 const hasFilters = computed(() => !!(filters.value.q || filters.value.datesChanged))
-// Development only: generated sample rows in the configured layout
-const mock = computed(() => !!config.value?.mockAvailable && queryString('mock') === '1')
 
 type QueryPatch = Record<string, string | number | undefined>
 
@@ -68,7 +90,7 @@ function updateQuery(patch: QueryPatch, { keepPage = false, replace = false } = 
 
 function clearFilters() {
   search.value = ''
-  updateQuery({ q: undefined, from: undefined, to: undefined, range: undefined })
+  updateQuery({ q: undefined, from: undefined, to: undefined })
 }
 
 // Calendar days become instants in the viewer's timezone; `to` is exclusive
@@ -77,16 +99,20 @@ const apiQuery = computed(() => ({
   pageSize: PAGE_SIZE,
   q: filters.value.q,
   from: filters.value.from?.toDate(timezone.value).toISOString(),
-  to: filters.value.to?.add({ days: 1 }).toDate(timezone.value).toISOString(),
-  mock: mock.value ? '1' : undefined
+  to: filters.value.to?.add({ days: 1 }).toDate(timezone.value).toISOString()
 }))
 
-const { data: results, status } = await useFetch(api, {
+// au-api can take several seconds over a busy week, so the page opens straight
+// away and the list loads in the browser afterwards, with a loader meanwhile
+const { data: results, status, error: loadError, refresh } = useFetch(api, {
   query: apiQuery,
+  lazy: true,
+  server: false,
   immediate: !!config.value?.configured,
   default: () => ({ items: [] as MessageRow[], total: 0, mock: false })
 })
-const loading = computed(() => status.value === 'pending')
+// 'idle' is the server render and the moment before the browser's first request
+const loading = computed(() => !!config.value?.configured && (status.value === 'pending' || status.value === 'idle'))
 const pageCount = computed(() => Math.max(1, Math.ceil(results.value.total / PAGE_SIZE)))
 
 // Search, debounced so each keystroke doesn't add a request or history entry
@@ -102,13 +128,11 @@ watch(() => filters.value.q, (value) => {
   }
 })
 
-// No dates means any time; the default range stays out of the URL
+// The default range stays out of the URL
 function setDates(from?: CalendarDate, to?: CalendarDate) {
   const { from: defaultFrom, to: defaultTo } = defaultRange()
-  const isDefault = from && to && from.compare(defaultFrom) === 0 && to.compare(defaultTo) === 0
-  updateQuery(from && to && !isDefault
-    ? { from: from.toString(), to: to.toString(), range: undefined }
-    : { from: undefined, to: undefined, range: isDefault ? undefined : 'all' })
+  const isDefault = !from || !to || (from.compare(defaultFrom) === 0 && to.compare(defaultTo) === 0)
+  updateQuery(isDefault ? { from: undefined, to: undefined } : { from: from.toString(), to: to.toString() })
 }
 
 // Table: columns come from the tenant's configured fields
@@ -132,10 +156,11 @@ watch(() => results.value.items[selectedIndex.value], (message) => {
     linkedMessage.value = message
   }
 })
-watch([selectedId, selectedIndex], async ([id, index]) => {
-  if (id && index === -1 && linkedMessage.value?.id !== id && config.value?.configured) {
+// Waits for the list, which usually has it
+watch([selectedId, selectedIndex, loading], async ([id, index, listLoading]) => {
+  if (id && index === -1 && !listLoading && linkedMessage.value?.id !== id && config.value?.configured) {
     try {
-      linkedMessage.value = await requestFetch<MessageRow>(`${api}/${encodeURIComponent(id)}`, { query: { mock: mock.value ? '1' : undefined } })
+      linkedMessage.value = await requestFetch<MessageRow>(`${api}/${encodeURIComponent(id)}`)
     } catch (err) {
       toast.add({ title: errorMessage(err, 'Message not found'), color: 'error' })
       updateQuery({ m: undefined }, { keepPage: true, replace: true })
@@ -173,118 +198,139 @@ function changePage(page: number) {
 }
 
 const emptyText = computed(() => {
-  if (hasFilters.value) {
-    return 'No messages match these filters.'
+  if (filters.value.q) {
+    return 'No messages match this search.'
   }
-  return `No messages in the last ${DEFAULT_RANGE_DAYS} days.`
+  return filters.value.datesChanged ? 'No messages in this range.' : 'No messages today.'
 })
+const rangeNote = computed(() => `Messages go back ${historyDays.value} ${historyDays.value === 1 ? 'day' : 'days'}, up to ${maxRangeDays.value} days at a time.`)
 </script>
 
 <template>
   <div
-    class="mx-auto w-full max-w-[1100px] px-6 py-6 transition-[padding] duration-200 sm:px-8 lg:px-10 lg:py-8"
-    :class="drawerOpen && 'xl:pr-[468px]'"
+    class="w-full px-6 py-6 transition-[padding] duration-200 sm:px-8 lg:px-10 lg:py-8"
+    :class="drawerOpen && 'xl:pr-[488px]'"
   >
-    <PageHeader
-      :kicker="tenant?.name ?? 'Account'"
-      title="Messages"
-      :description="`Messages taken on your behalf. Times are shown in ${timezoneName}.`"
-    >
-      <template #actions>
-        <USwitch
-          v-if="config?.mockAvailable && config.configured"
-          :model-value="mock"
-          label="Sample data"
-          description="Development only"
-          @update:model-value="updateQuery({ mock: $event ? '1' : undefined, m: undefined })"
+    <!-- Wider than other pages so the configured columns fit; the open drawer takes
+         its width off the side rather than out of the content cap -->
+    <div class="mx-auto w-full max-w-[1600px]">
+      <PageHeader
+        :kicker="tenant?.name ?? 'Account'"
+        title="Messages"
+        :description="`Messages taken on your behalf. Times are shown in ${timezoneName}.`"
+      />
+
+      <template v-if="config && !config.configured">
+        <UAlert
+          v-if="config.canConfigure"
+          class="mt-10"
+          color="neutral"
+          variant="subtle"
+          icon="i-lucide-list-checks"
+          title="Messages aren’t set up for this account yet"
+          description="Choose which fields of the account’s script the messages list shows."
+          :actions="[{ label: 'Set up message fields', to: `/admin/tenants/${tenantId}/message-fields`, color: 'neutral', variant: 'outline', icon: 'i-lucide-arrow-right' }]"
+        />
+        <UAlert
+          v-else
+          class="mt-10"
+          color="neutral"
+          variant="subtle"
+          icon="i-lucide-message-square"
+          title="Messages aren’t set up yet"
+          description="Messages taken for this account will appear here once Answer United finishes setting them up."
         />
       </template>
-    </PageHeader>
 
-    <template v-if="config && !config.configured">
-      <UAlert
-        v-if="config.canConfigure"
-        class="mt-10"
-        color="neutral"
-        variant="subtle"
-        icon="i-lucide-list-checks"
-        title="Messages aren’t set up for this account yet"
-        description="Choose which fields of the account’s script the messages list shows."
-        :actions="[{ label: 'Set up message fields', to: `/admin/tenants/${tenantId}/message-fields`, color: 'neutral', variant: 'outline', icon: 'i-lucide-arrow-right' }]"
-      />
-      <UAlert
-        v-else
-        class="mt-10"
-        color="neutral"
-        variant="subtle"
-        icon="i-lucide-message-square"
-        title="Messages aren’t set up yet"
-        description="Messages taken for this account will appear here once Answer United finishes setting them up."
-      />
-    </template>
+      <template v-else-if="config">
+        <div class="mt-10 flex flex-wrap items-center gap-2">
+          <UInput
+            v-model="search"
+            icon="i-lucide-search"
+            placeholder="Search messages"
+            class="w-full sm:w-64"
+            aria-label="Search messages"
+          />
 
-    <template v-else-if="config">
-      <div class="mt-10 flex flex-wrap items-center gap-2">
-        <UInput
-          v-model="search"
-          icon="i-lucide-search"
-          placeholder="Search messages"
-          class="w-full sm:w-64"
-          aria-label="Search messages"
+          <DateRangeFilter
+            :from="filters.from"
+            :to="filters.to"
+            :timezone="timezone"
+            :earliest="earliestDate"
+            :max-days="maxRangeDays"
+            :note="rangeNote"
+            @change="setDates"
+          />
+
+          <UButton
+            v-if="hasFilters"
+            label="Clear filters"
+            icon="i-lucide-x"
+            color="neutral"
+            variant="ghost"
+            @click="clearFilters"
+          />
+        </div>
+
+        <UAlert
+          v-if="loadError && !loading"
+          class="mt-6"
+          color="error"
+          variant="subtle"
+          icon="i-lucide-circle-alert"
+          :title="errorMessage(loadError, 'Couldn’t load messages')"
+          description="Your filters are kept. Try again in a moment."
+          :actions="[{ label: 'Try again', color: 'neutral', variant: 'outline', icon: 'i-lucide-refresh-cw', onClick: () => refresh() }]"
         />
 
-        <DateRangeFilter
-          :from="filters.from"
-          :to="filters.to"
-          :timezone="timezone"
-          @change="setDates"
-        />
+        <p
+          v-else
+          class="mono-meta mt-6"
+        >
+          <template v-if="loading">
+            Loading messages…
+          </template><template v-else>
+            {{ results.total.toLocaleString('en-US') }} {{ results.total === 1 ? 'message' : 'messages' }}
+          </template><template v-if="!loading && pageCount > 1">
+            · page {{ filters.page }} of {{ pageCount }}
+          </template><template v-if="results.mock">
+            · sample data
+          </template>
+        </p>
 
-        <UButton
-          v-if="hasFilters"
-          label="Clear filters"
-          icon="i-lucide-x"
-          color="neutral"
-          variant="ghost"
-          @click="clearFilters"
-        />
-      </div>
+        <UCard
+          class="mt-3"
+          :ui="{ body: 'p-0 sm:p-0' }"
+        >
+          <UTable
+            :data="results.items"
+            :columns="tableColumns"
+            :meta="tableMeta"
+            :ui="{ th: 'whitespace-nowrap' }"
+            :loading="loading"
+            :get-row-id="(row: MessageRow) => row.id"
+            :empty="loadError ? 'Messages couldn’t be loaded.' : emptyText"
+            @select="(_e: Event, row: { original: MessageRow }) => openMessage(row.original)"
+          >
+            <template #loading>
+              <TableLoading label="Loading messages…" />
+            </template>
+          </UTable>
+        </UCard>
 
-      <p class="mono-meta mt-6">
-        {{ results.total.toLocaleString('en-US') }} {{ results.total === 1 ? 'message' : 'messages' }}<template v-if="pageCount > 1">
-          · page {{ filters.page }} of {{ pageCount }}
-        </template><template v-if="results.mock">
-          · sample data
-        </template>
-      </p>
-
-      <UCard
-        class="mt-3"
-        :ui="{ body: 'p-0 sm:p-0' }"
-      >
-        <UTable
-          :data="results.items"
-          :columns="tableColumns"
-          :meta="tableMeta"
-          :loading="loading"
-          :get-row-id="(row: MessageRow) => row.id"
-          :empty="emptyText"
-          @select="(_e: Event, row: { original: MessageRow }) => openMessage(row.original)"
-        />
-      </UCard>
-
-      <div
-        v-if="pageCount > 1"
-        class="mt-6 flex justify-center"
-      >
-        <UPagination
-          :page="filters.page"
-          :total="results.total"
-          :items-per-page="PAGE_SIZE"
-          @update:page="changePage"
-        />
-      </div>
-    </template>
+        <div
+          v-if="pageCount > 1"
+          class="mt-6 flex justify-center"
+        >
+          <UPagination
+            :page="filters.page"
+            :total="results.total"
+            :items-per-page="PAGE_SIZE"
+            @update:page="changePage"
+          />
+        </div>
+      </template>
+    </div>
 
     <MessageDrawer
       v-model:open="drawerOpen"

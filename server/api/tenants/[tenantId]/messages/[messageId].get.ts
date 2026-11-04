@@ -1,28 +1,23 @@
 import { eq } from 'drizzle-orm'
-import { z } from 'zod'
-
-const querySchema = z.object({
-  mock: z.enum(['1']).optional()
-})
-
-// One message, for a deep link to the detail drawer
+// One message, for a deep link to the detail drawer. Only the tenant's own
+// account numbers and history window count; anything else is the same 404.
 export default defineEventHandler(async (event) => {
   const tenantId = getRouterParam(event, 'tenantId')!
-  await requireTenantRole(event, tenantId, 'viewer')
-  const query = await getValidatedQuery(event, querySchema.parse)
+  const { tenant } = await requireTenantRole(event, tenantId, 'viewer')
 
   const fields = await visibleMessageFields(tenantId)
   const accounts = await useDb().query.tenantRecordingAccounts.findMany({
     where: eq(tables.tenantRecordingAccounts.tenantId, tenantId)
   })
   const message = fields.length
-    ? await messageSource({ mock: query.mock === '1' }).get(getRouterParam(event, 'messageId')!, {
+    ? await messageSource().get(getRouterParam(event, 'messageId')!, {
         tenantId,
         accountNumbers: accounts.map(account => account.accountNumber),
         fields
       })
     : null
-  if (!message) {
+  const historyStart = messageHistoryStart(tenant.recordingHistoryDays)
+  if (!message || !message.createdAt || message.createdAt < historyStart) {
     throw createError({ statusCode: 404, message: 'Message not found' })
   }
   return serializeMessage(message, fields)

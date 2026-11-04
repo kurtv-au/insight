@@ -6,8 +6,8 @@
  * A field's identity is its `fieldKey`: the script's own field name (an
  * element or call-field `Name` from au-api `/v1/scripts/active`), never the
  * display label. Script names are case-insensitive, so keys are compared
- * through `canonicalFieldKey()`. The data-retrieval session joins stored
- * message values on this key.
+ * through `canonicalFieldKey()`. Message values from au-api `/v1/messages`
+ * are requested and joined on this key.
  *
  * Shared by client and server. Imports are explicit (not auto-imports) so unit
  * tests and drizzle-kit can load this file on its own.
@@ -20,6 +20,17 @@ import type { MessageFieldType } from './messageFieldTypes'
 /** More than any script has; keeps a tenant's config a sane size. */
 export const MAX_MESSAGE_FIELDS = 200
 export const MAX_SELECT_OPTIONS = 500
+
+/** au-api `/v1/messages` returns at most this many fields per request */
+export const MAX_RETRIEVED_MESSAGE_FIELDS = 50
+/** au-api `/v1/messages` reads at most this many days per request; the page offers no more */
+export const MAX_MESSAGE_RANGE_DAYS = 7
+/** The field names au-api `/v1/messages` accepts. Other names can't be loaded. */
+export const RETRIEVABLE_FIELD_KEY = /^(?!__)[A-Za-z_][A-Za-z0-9_.-]{0,63}$/
+
+export function isRetrievableFieldKey(key: string) {
+  return RETRIEVABLE_FIELD_KEY.test(key)
+}
 
 /* ---------------------------------------------------------------- formats */
 
@@ -142,6 +153,9 @@ export const messageFieldConfigInputSchema = z.object({
   const orders = data.fields.map(field => field.order).sort((a, z) => a - z)
   if (orders.some((order, index) => order !== index)) {
     ctx.addIssue({ code: 'custom', path: ['fields'], message: 'Field order must run 0, 1, 2… with no gaps or repeats' })
+  }
+  if (data.fields.filter(field => field.isActive).length > MAX_RETRIEVED_MESSAGE_FIELDS) {
+    ctx.addIssue({ code: 'custom', path: ['fields'], message: `Messages can show at most ${MAX_RETRIEVED_MESSAGE_FIELDS} fields; turn some off` })
   }
 })
 
@@ -368,8 +382,8 @@ export type MessageFieldValue = string | number | boolean | null
  */
 export interface MessageRow {
   id: string
-  /** ISO 8601 instant */
-  createdAt: string
+  /** ISO 8601 instant; null if the store has no time for the message */
+  createdAt: string | null
   accountNumber: string | null
   fields: Record<string, MessageFieldValue>
 }

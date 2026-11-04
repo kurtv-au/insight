@@ -1,5 +1,5 @@
+import { auApiMessages, MESSAGES_UNAVAILABLE } from '../messages/au-api'
 import { mockMessages } from '../messages/mock'
-import { stubMessages } from '../messages/stub'
 
 /**
  * A stored message, as a message source returns it. `values` is keyed by the
@@ -8,7 +8,8 @@ import { stubMessages } from '../messages/stub'
  */
 export interface StoredMessage {
   id: string
-  createdAt: Date
+  /** When the message was taken; null if the store has no time for it */
+  createdAt: Date | null
   accountNumber: string | null
   values: Record<string, unknown>
 }
@@ -37,15 +38,29 @@ export interface MessageSource {
 }
 
 /**
- * Where messages come from. Until real retrieval exists this is the empty stub
- * (server/messages/stub.ts); in development `mock` swaps in generated sample
- * rows so the configured layout can be checked. Production ignores `mock`.
+ * Where messages come from: au-api when a key is configured. Without one,
+ * development uses generated rows in the configured layout and production
+ * fails rather than show made-up messages.
  */
-export function messageSource(options: { mock?: boolean } = {}): MessageSource {
-  if (options.mock && import.meta.dev) {
+export function messageSource(): MessageSource {
+  if (useRuntimeConfig().auApi.key) {
+    return auApiMessages
+  }
+  if (import.meta.dev) {
     return mockMessages
   }
-  return stubMessages
+  throw createError({ statusCode: 503, message: MESSAGES_UNAVAILABLE })
+}
+
+/**
+ * The earliest moment a tenant's messages can be loaded from. Messages share
+ * the recordings history setting. Rounded down to the minute so a range clamped
+ * to it stays the same between requests (au-api caches by range).
+ */
+export function messageHistoryStart(historyDays: number, now = new Date()) {
+  const start = recordingHistoryStart(historyDays, now)
+  start.setUTCSeconds(0, 0)
+  return start
 }
 
 function toFieldValue(value: unknown): MessageFieldValue {
@@ -69,7 +84,7 @@ export function serializeMessage(message: StoredMessage, fields: readonly Pick<M
   const values = new Map(Object.entries(message.values).map(([key, value]) => [canonicalFieldKey(key), value]))
   return {
     id: message.id,
-    createdAt: message.createdAt.toISOString(),
+    createdAt: message.createdAt?.toISOString() ?? null,
     accountNumber: message.accountNumber,
     fields: Object.fromEntries(fields.map(field => [field.fieldKey, toFieldValue(values.get(canonicalFieldKey(field.fieldKey)))]))
   }

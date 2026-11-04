@@ -36,15 +36,17 @@ const shown = computed(() => detailFields(props.fields))
         v-if="message"
         class="divide-y divide-muted border-y border-muted"
       >
+        <!-- Short values sit beside their label; long text gets the full width under it -->
         <div
           v-for="field in shown"
           :key="field.fieldKey"
-          class="grid gap-1 py-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] sm:gap-4"
+          class="grid gap-1 py-3"
+          :class="field.type !== 'longText' && 'sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-4'"
         >
-          <dt class="kicker">
+          <dt class="kicker pt-0.5">
             {{ field.label }}
           </dt>
-          <dd class="text-body-sm text-highlighted sm:text-right">
+          <dd class="text-body-sm text-highlighted break-words">
             <component :is="() => messageCell(message!.fields[field.fieldKey], field, timezone, 'detail')" />
           </dd>
         </div>

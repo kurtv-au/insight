@@ -332,7 +332,7 @@ async function removeAccountNumber(accountNumber: string) {
               <UFormField
                 label="History"
                 name="recordingHistoryDays"
-                :help="`Days of recordings this account can load, counting back from now. Default ${DEFAULT_RECORDING_HISTORY_DAYS}.`"
+                :help="`Days of recordings and messages this account can load, counting back from now. Default ${DEFAULT_RECORDING_HISTORY_DAYS}.`"
               >
                 <UInputNumber
                   v-model="history.recordingHistoryDays"

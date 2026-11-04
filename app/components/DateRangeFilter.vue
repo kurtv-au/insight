@@ -4,6 +4,7 @@ import { today } from '@internationalized/date'
 
 // A date-range button with presets and a calendar, shared by the recordings and
 // messages lists. No dates means "Any time". Days are calendar days in `timezone`.
+// With `maxDays`, ranges are capped at that many days and there is no "Any time".
 const props = defineProps<{
   from?: CalendarDate
   to?: CalendarDate
@@ -12,6 +13,8 @@ const props = defineProps<{
   earliest?: CalendarDate
   /** A line under the calendar, e.g. how far back history goes */
   note?: string
+  /** The longest range, in days counting both ends. Hides "Any time". */
+  maxDays?: number
 }>()
 
 const emit = defineEmits<{
@@ -28,7 +31,8 @@ const presets = computed(() => {
     { label: 'Yesterday', from: t.subtract({ days: 1 }), to: t.subtract({ days: 1 }) },
     { label: 'Last 7 days', from: t.subtract({ days: 6 }), to: t },
     { label: 'Last 30 days', from: t.subtract({ days: 29 }), to: t }
-  ].filter(preset => !props.earliest || preset.from.compare(props.earliest) >= 0)
+  ].filter(preset => (!props.earliest || preset.from.compare(props.earliest) >= 0)
+    && (!props.maxDays || preset.to.compare(preset.from) < props.maxDays))
 })
 
 const shortDate = (date: CalendarDate) => formatDate(date.toDate(props.timezone), props.timezone).replace(/, \d{4}$/, '')
@@ -54,6 +58,10 @@ const calendarRange = computed({
 })
 
 function choose(from?: CalendarDate, to?: CalendarDate) {
+  // The calendar enforces maxDays; this covers anything that gets past it
+  if (props.maxDays && from && to && to.compare(from) >= props.maxDays) {
+    from = to.subtract({ days: props.maxDays - 1 })
+  }
   emit('change', from, to)
   open.value = false
 }
@@ -84,6 +92,7 @@ function choose(from?: CalendarDate, to?: CalendarDate) {
             @click="choose(preset.from, preset.to)"
           />
           <UButton
+            v-if="!maxDays"
             label="Any time"
             color="neutral"
             :variant="label === 'Any time' ? 'soft' : 'ghost'"
@@ -97,6 +106,7 @@ function choose(from?: CalendarDate, to?: CalendarDate) {
             range
             :min-value="earliest"
             :max-value="todayDate"
+            :maximum-days="maxDays"
           />
           <p
             v-if="note"

@@ -43,7 +43,9 @@ CI (`.github/workflows/ci.yml`) runs lint, typecheck and the Vitest unit tests, 
 - The page's fields come from the tenant's chosen account's **active script**. The config lives in `tenant_message_settings` and `tenant_message_fields`, the shared rules (types, formats, drift, `formatFieldValue()`, `MessageRow`) in `shared/utils/messageFields.ts`, and the saves in `server/utils/messageConfig.ts`.
 - `fieldKey` is the script's own field name, matched case-insensitively (`canonicalFieldKey()`). Saves replace the whole config in one transaction, guarded by `revision`. Orphan state is decided on the server against the live script.
 - Script fields come from au-api's `/v1/scripts/active` through `ScriptSource` (`server/utils/scripts.ts`), or the mock in development.
-- Message data comes through `MessageSource` (`server/utils/messages.ts`). It's still the stub; see `docs/messages-handoff.md`. `serializeMessage()` drops anything outside the visible fields, and search must too.
+- Message data comes from au-api's `/v1/messages` through `MessageSource` (`server/utils/messages.ts`, `server/messages/au-api.ts`), or the mock in development. `serializeMessage()` drops anything outside the visible fields, and search must too (au-api searches only the fields requested, so request only visible ones).
+- au-api limits: at most 50 fields per request (saves cap active fields at 50), names matching `RETRIEVABLE_FIELD_KEY`, and at most 7 days per request. Ranges come from the page as calendar days, so a week across DST is split into windows (`splitRange()`/`paginateWindows()`).
+- The insight key spans every client: a single message must be checked against the tenant's own account numbers (and its history window, which is the recordings setting) before it's returned.
 
 ## Design
 

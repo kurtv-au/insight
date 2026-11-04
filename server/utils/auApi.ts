@@ -9,12 +9,12 @@
 export async function auApiGet<T>(
   path: string,
   query: Record<string, string | number | undefined> | undefined,
-  options: { tag: string, unavailableMessage: string }
+  options: { tag: string, unavailableMessage: string, timeout?: number }
 ): Promise<T | null> {
   const { url, key } = useRuntimeConfig().auApi
   try {
     // An external URL: the cast stops Nitro typing it as one of insight's own routes
-    return await $fetch<T>(path, { baseURL: url, query, headers: { Authorization: `Bearer ${key}` } }) as T
+    return await $fetch<T>(path, { baseURL: url, query, timeout: options.timeout, headers: { Authorization: `Bearer ${key}` } }) as T
   } catch (err) {
     const status = (err as { statusCode?: number }).statusCode
     if (status === 404) {

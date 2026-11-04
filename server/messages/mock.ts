@@ -13,17 +13,17 @@ function generate(query: Pick<MessageQuery, 'accountNumbers' | 'fields'>): Store
   return sampleMessageRows(query.fields, { count: COUNT, now, accountNumber: query.accountNumbers[0] ?? null })
     .map(row => ({
       id: row.id.replace('sample', 'mock'),
-      createdAt: new Date(row.createdAt),
+      createdAt: row.createdAt ? new Date(row.createdAt) : null,
       accountNumber: row.accountNumber,
       values: row.fields
     }))
 }
 
 function matches(message: StoredMessage, query: MessageQuery) {
-  if (query.from && message.createdAt < query.from) {
+  if (query.from && (!message.createdAt || message.createdAt < query.from)) {
     return false
   }
-  if (query.to && message.createdAt >= query.to) {
+  if (query.to && (!message.createdAt || message.createdAt >= query.to)) {
     return false
   }
   if (!query.q) {
