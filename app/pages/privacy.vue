@@ -11,7 +11,7 @@ useSeoMeta({ title: 'Privacy Policy' })
       description="What Insight collects about you, why, and the choices you have."
     />
     <p class="mono-meta mt-6">
-      Last updated October 28, 2026
+      Last updated November 3, 2026
     </p>
 
     <div class="legal-prose mt-8">
@@ -40,6 +40,9 @@ useSeoMeta({ title: 'Privacy Policy' })
       <h3>Client content</h3>
       <p>
         Insight displays messages, call recordings and caller details that Answer United handles for its clients. We process this information on the client’s behalf and under our agreement with the client, and the client decides who can see it. If you have a question about your information in a client’s messages or recordings, please contact that client.
+      </p>
+      <p>
+        Insight does not keep its own copy of messages or recordings. Each time you open one, Insight fetches it from Answer United’s message and recording systems over an encrypted connection and shows it to you. Insight stores only how each account’s messages are laid out: which message fields are shown and how they are labeled.
       </p>
 
       <h2>2. Cookies and browser storage</h2>

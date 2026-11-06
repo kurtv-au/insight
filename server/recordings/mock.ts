@@ -1,4 +1,4 @@
-import type { Recording, RecordingQuery } from '../utils/recordings'
+import type { Recording, RecordingQuery, RecordingSource } from '../utils/recordings'
 
 // Mock recordings, generated deterministically from the account number and the
 // day, so the same calls come back on every request without storing anything.
@@ -26,12 +26,6 @@ function random(seed: number) {
   }
 }
 
-function agentsFor(accountNumber: string) {
-  const rand = random(hash(`agents:${accountNumber}`))
-  const letter = () => String.fromCharCode(65 + Math.floor(rand() * 26))
-  return Array.from({ length: 10 }, () => letter() + letter() + (rand() < 0.3 ? letter() : ''))
-}
-
 const dayCache = new Map<string, Recording[]>()
 
 /** Every call for one account number on one UTC day, newest first */
@@ -43,7 +37,6 @@ function dayRecordings(accountNumber: string, day: number): Recording[] {
   }
 
   const rand = random(hash(key))
-  const agents = agentsFor(accountNumber)
   const count = 10 + Math.floor(rand() * 31)
   const recordings: Recording[] = []
 
@@ -60,7 +53,6 @@ function dayRecordings(accountNumber: string, day: number): Recording[] {
       accountNumber,
       startedAt,
       ani,
-      agent: agents[Math.floor(rand() * agents.length)]!,
       // Skewed toward short calls: 15 seconds to 9 minutes
       durationSeconds: 15 + Math.floor(rand() ** 2 * 525)
     })
@@ -85,21 +77,12 @@ function matches(recording: Recording, query: RecordingQuery, now: number) {
   if (query.minDuration && recording.durationSeconds < query.minDuration) {
     return false
   }
-  if (query.search) {
-    // Letters search agent initials; digits search the caller ID
-    if (/[a-z]/i.test(query.search)) {
-      return !!query.searchAgent && recording.agent.includes(query.search.replace(/[^a-z]/gi, '').toUpperCase())
-    }
-    const digits = query.search.replace(/\D/g, '')
-    return !!query.searchAni && !!digits && !!recording.ani?.includes(digits)
-  }
-  return true
+  return !query.callerDigits || !!recording.ani?.includes(query.callerDigits)
 }
 
 const SORT_VALUES: Record<RecordingColumn, (recording: Recording) => string | number | null> = {
   timestamp: recording => recording.startedAt.getTime(),
   ani: recording => recording.ani,
-  agent: recording => recording.agent,
   accountNumber: recording => recording.accountNumber,
   duration: recording => recording.durationSeconds
 }
@@ -125,7 +108,7 @@ function compareBy(sort: RecordingColumn, direction: SortDirection) {
   }
 }
 
-export function listMockRecordings(query: RecordingQuery) {
+function listMockRecordings(query: RecordingQuery) {
   const now = Date.now()
   const today = Math.floor(now / DAY_MS)
   const matching: Recording[] = []
@@ -140,7 +123,7 @@ export function listMockRecordings(query: RecordingQuery) {
   return { items: matching.slice(query.offset, query.offset + query.limit), total: matching.length }
 }
 
-export function getMockRecording(id: string) {
+function getMockRecording(id: string) {
   const [accountNumber, unix] = id.split('~')
   const seconds = Number(unix)
   if (!accountNumber || !Number.isInteger(seconds)) {
@@ -151,14 +134,14 @@ export function getMockRecording(id: string) {
 }
 
 const SAMPLE_RATE = 8000
-const audioCache = new Map<string, Buffer>()
+const audioCache = new Map<string, Buffer<ArrayBuffer>>()
 
 /**
  * An 8 kHz, 8-bit mono WAV the length of the call: two "voices" taking turns,
  * made of buzzy syllables at different pitches. Recent ones are cached because
  * browsers fetch audio in several range requests.
  */
-export function mockRecordingAudio(recording: Recording) {
+function mockRecordingAudio(recording: Recording) {
   const cached = audioCache.get(recording.id)
   if (cached) {
     return cached
@@ -222,4 +205,29 @@ export function mockRecordingAudio(recording: Recording) {
   }
   audioCache.set(recording.id, buffer)
   return buffer
+}
+
+/** The WAV as the response to a request, or to a "bytes=start-end", "bytes=start-" or last-N-bytes Range */
+function audioResponse(audio: Buffer<ArrayBuffer>, range: string | undefined) {
+  const headers = { 'Content-Type': 'audio/wav', 'Accept-Ranges': 'bytes' }
+  const match = /^bytes=(\d*)-(\d*)$/.exec(range ?? '')
+  if (!match || (!match[1] && !match[2])) {
+    return new Response(audio, { headers: { ...headers, 'Content-Length': String(audio.length) } })
+  }
+
+  const start = match[1] ? Number(match[1]) : Math.max(0, audio.length - Number(match[2]))
+  const end = match[1] && match[2] ? Math.min(Number(match[2]), audio.length - 1) : audio.length - 1
+  if (start >= audio.length || start > end) {
+    return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${audio.length}` } })
+  }
+  return new Response(audio.subarray(start, end + 1), {
+    status: 206,
+    headers: { ...headers, 'Content-Range': `bytes ${start}-${end}/${audio.length}`, 'Content-Length': String(end - start + 1) }
+  })
+}
+
+export const mockRecordings: RecordingSource = {
+  list: async query => listMockRecordings(query),
+  get: async id => getMockRecording(id),
+  audio: async (recording, range) => audioResponse(mockRecordingAudio(recording), range)
 }

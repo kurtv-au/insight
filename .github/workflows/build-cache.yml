@@ -1,0 +1,58 @@
+name: build-cache
+
+# Refreshes the offline build cache (scripts/build-cache.sh) in S3 whenever an
+# input to it changes. This is the only part of the release pipeline that
+# talks to the npm registry, nodejs.org or any other public source; the
+# release build itself runs with no network. See docs/DEPLOYMENT.md
+# "Offline builds".
+#
+# Repository variables: AWS_REGION, AWS_ROLE_ARN, ARTIFACT_BUCKET.
+
+on:
+  push:
+    paths:
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      - package.json
+      - .node-version
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: build-cache-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  cache:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+
+      - name: AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Build or reuse the cache
+        env:
+          BUCKET: ${{ vars.ARTIFACT_BUCKET }}
+        run: |
+          KEY="$(bash scripts/build-cache.sh key)"
+          OBJECT="s3://$BUCKET/insight/build-cache/$KEY.tar.gz"
+          if aws s3 ls "$OBJECT" >/dev/null 2>&1; then
+            echo "Cache $KEY already in S3; nothing to do."
+            exit 0
+          fi
+          bash scripts/build-cache.sh create "$RUNNER_TEMP/build-cache.tar.gz"
+          aws s3 cp "$RUNNER_TEMP/build-cache.tar.gz" "$OBJECT"
+          echo "### Build cache \`$KEY\` uploaded" >> "$GITHUB_STEP_SUMMARY"

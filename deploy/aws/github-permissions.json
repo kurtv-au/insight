@@ -1,0 +1,40 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "Artifacts",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:PutObject"],
+      "Resource": [
+        "arn:aws:s3:::au-insight-releases/insight/build-cache/*",
+        "arn:aws:s3:::au-insight-releases/insight/releases/*"
+      ]
+    },
+    {
+      "Sid": "ListArtifacts",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::au-insight-releases",
+      "Condition": { "StringLike": { "s3:prefix": "insight/*" } }
+    },
+    {
+      "Sid": "RunShellScriptDocument",
+      "Effect": "Allow",
+      "Action": "ssm:SendCommand",
+      "Resource": "arn:aws:ssm:us-east-1::document/AWS-RunShellScript"
+    },
+    {
+      "Sid": "OnlyInsightInstances",
+      "Effect": "Allow",
+      "Action": "ssm:SendCommand",
+      "Resource": "arn:aws:ec2:us-east-1:822778518482:instance/*",
+      "Condition": { "StringEquals": { "aws:ResourceTag/App": "insight" } }
+    },
+    {
+      "Sid": "CommandStatus",
+      "Effect": "Allow",
+      "Action": ["ssm:ListCommands", "ssm:ListCommandInvocations"],
+      "Resource": "*"
+    }
+  ]
+}

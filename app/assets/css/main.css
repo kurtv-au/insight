@@ -2,6 +2,108 @@
 @import "@nuxt/ui";
 
 /* ------------------------------------------------------------------ */
+/* Fonts, self-hosted from public/fonts (variable woff2, Latin and      */
+/* Latin Extended; all SIL Open Font License). Nothing is fetched at    */
+/* build or run time, so release builds work offline (docs/DEPLOYMENT.md). */
+/* ------------------------------------------------------------------ */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter/inter-normal-latin-ext.woff2') format('woff2');
+  unicode-range: U+100-2BA, U+2BD-2C5, U+2C7-2CC, U+2CE-2D7, U+2DD-2FF, U+304, U+308, U+329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter/inter-normal-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+131, U+152-153, U+2BB-2BC, U+2C6, U+2DA, U+2DC, U+304, U+308, U+329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter/inter-italic-latin-ext.woff2') format('woff2');
+  unicode-range: U+100-2BA, U+2BD-2C5, U+2C7-2CC, U+2CE-2D7, U+2DD-2FF, U+304, U+308, U+329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter/inter-italic-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+131, U+152-153, U+2BB-2BC, U+2C6, U+2DA, U+2DC, U+304, U+308, U+329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('/fonts/bricolage-grotesque/bricolage-grotesque-normal-latin-ext.woff2') format('woff2');
+  unicode-range: U+100-2BA, U+2BD-2C5, U+2C7-2CC, U+2CE-2D7, U+2DD-2FF, U+304, U+308, U+329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('/fonts/bricolage-grotesque/bricolage-grotesque-normal-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+131, U+152-153, U+2BB-2BC, U+2C6, U+2DA, U+2DC, U+304, U+308, U+329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Spline Sans Mono';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url('/fonts/spline-sans-mono/spline-sans-mono-normal-latin-ext.woff2') format('woff2');
+  unicode-range: U+100-2BA, U+2BD-2C5, U+2C7-2CC, U+2CE-2D7, U+2DD-2FF, U+304, U+308, U+329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Spline Sans Mono';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url('/fonts/spline-sans-mono/spline-sans-mono-normal-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+131, U+152-153, U+2BB-2BC, U+2C6, U+2DA, U+2DC, U+304, U+308, U+329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/geist-mono/geist-mono-normal-latin-ext.woff2') format('woff2');
+  unicode-range: U+100-2BA, U+2BD-2C5, U+2C7-2CC, U+2CE-2D7, U+2DD-2FF, U+304, U+308, U+329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/geist-mono/geist-mono-normal-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+131, U+152-153, U+2BB-2BC, U+2C6, U+2DA, U+2DC, U+304, U+308, U+329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Instrument Sans';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/instrument-sans/instrument-sans-normal-latin-ext.woff2') format('woff2');
+  unicode-range: U+100-2BA, U+2BD-2C5, U+2C7-2CC, U+2CE-2D7, U+2DD-2FF, U+304, U+308, U+329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Instrument Sans';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/instrument-sans/instrument-sans-normal-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+131, U+152-153, U+2BB-2BC, U+2C6, U+2DA, U+2DC, U+304, U+308, U+329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ------------------------------------------------------------------ */
 /* Color ramps. `static` is required: Nuxt UI resolves                 */
 /* --ui-color-primary-400 as var(--color-cobalt-400) at runtime, so the  */
 /* ramp variables must be emitted even when no utility references them. */

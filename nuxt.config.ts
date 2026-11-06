@@ -27,6 +27,12 @@ export default defineNuxtConfig({
     fallback: 'light'
   },
 
+  // Fonts are self-hosted (public/fonts, @font-face in main.css): @nuxt/fonts
+  // would download them from Google at build time, and releases build offline
+  ui: {
+    fonts: false
+  },
+
   runtimeConfig: {
     databaseUrl: '',
     email: {
@@ -41,9 +47,16 @@ export default defineNuxtConfig({
       // Where the /support form is delivered
       email: ''
     },
+    // The recordings API (au-api /v1). Without a key, development uses mock recordings.
+    auApi: {
+      url: 'https://api.answerunited.net',
+      key: ''
+    },
     public: {
       appName: 'Insight',
-      appUrl: 'http://localhost:3000'
+      appUrl: 'http://localhost:3000',
+      // The release (deploy/: PM2 sets NUXT_PUBLIC_APP_VERSION), shown by /api/health
+      appVersion: 'dev'
     }
   },
 
@@ -60,15 +73,5 @@ export default defineNuxtConfig({
         braceStyle: '1tbs'
       }
     }
-  },
-
-  fonts: {
-    families: [
-      { name: 'Inter', provider: 'google', weights: ['100 900'] },
-      { name: 'Bricolage Grotesque', provider: 'google', weights: ['200 800'] },
-      { name: 'Spline Sans Mono', provider: 'google', weights: ['300 700'] },
-      { name: 'Geist Mono', provider: 'google', weights: ['100 900'] },
-      { name: 'Instrument Sans', provider: 'google', weights: ['400 700'] }
-    ]
   }
 })

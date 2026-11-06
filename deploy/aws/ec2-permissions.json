@@ -1,0 +1,18 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "Releases",
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::au-insight-releases/insight/releases/*"
+    },
+    {
+      "Sid": "SendEmail",
+      "Effect": "Allow",
+      "Action": ["ses:SendEmail", "ses:SendRawEmail"],
+      "Resource": "arn:aws:ses:us-east-1:822778518482:identity/answerunited.com",
+      "Condition": { "StringEquals": { "ses:FromAddress": "no-reply@answerunited.com" } }
+    }
+  ]
+}

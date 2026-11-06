@@ -1,24 +1,24 @@
 import { eq } from 'drizzle-orm'
 import type { H3Event } from 'h3'
-import { getMockRecording, listMockRecordings, mockRecordingAudio } from '../recordings/mock'
+import { auApiRecordings } from '../recordings/au-api'
+import { mockRecordings } from '../recordings/mock'
 
 export interface Recording {
   id: string
   accountNumber: string
   startedAt: Date
   ani: string | null
-  agent: string
   durationSeconds: number
+  /** Where the live API's audio can be fetched for the next few minutes. Server-only. */
+  audioUrl?: string | null
 }
 
 export interface RecordingQuery {
   accountNumbers: string[]
   from?: Date
   to?: Date
-  search?: string
-  /** Whether the search may match caller IDs / agent initials (only if those columns are available) */
-  searchAni?: boolean
-  searchAgent?: boolean
+  /** Digits to find anywhere in the caller ID */
+  callerDigits?: string
   accountNumber?: string
   minDuration?: number
   /** Ties, and calls with no caller ID, go newest first after the sorted column */
@@ -28,38 +28,44 @@ export interface RecordingQuery {
   limit: number
 }
 
-// The recording source. These use generated mock data until the live recordings
-// API is connected; swap the implementations here and nothing else changes.
+export interface RecordingSource {
+  /** Matching recordings in the query's order, one page at a time */
+  list(query: RecordingQuery): Promise<{ items: Recording[], total: number }>
+  get(id: string): Promise<Recording | null>
+  /** The recording's audio, honouring the browser's Range header so it can seek */
+  audio(recording: Recording, range: string | undefined): Promise<Response>
+}
 
-/** Matching recordings in the query's order, one page at a time */
+// The recordings API when a key is configured. Without one, development uses
+// generated mock data, and production fails rather than show made-up calls.
+function source(): RecordingSource {
+  if (useRuntimeConfig().auApi.key) {
+    return auApiRecordings
+  }
+  if (import.meta.dev) {
+    return mockRecordings
+  }
+  throw createError({ statusCode: 503, message: 'Recordings aren’t available right now' })
+}
+
 export async function listRecordings(query: RecordingQuery): Promise<{ items: Recording[], total: number }> {
   if (!query.accountNumbers.length) {
     return { items: [], total: 0 }
   }
-  return listMockRecordings(query)
+  return source().list(query)
 }
 
 export async function getRecording(id: string): Promise<Recording | null> {
-  return getMockRecording(id)
+  return source().get(id)
 }
 
-/** The recording's audio as a WAV file */
-export async function recordingAudio(recording: Recording): Promise<Buffer> {
-  return mockRecordingAudio(recording)
-}
-
-/** Bars in the player's waveform */
-const WAVEFORM_BARS = 72
-
-/** The recording's loudness over time, 0–1, for the player's waveform */
-export async function recordingWaveform(recording: Recording): Promise<number[]> {
-  // If the live API supplies its own waveform data, return that here instead
-  return wavPeaks(await recordingAudio(recording), WAVEFORM_BARS)
+export async function recordingAudio(recording: Recording, range: string | undefined): Promise<Response> {
+  return source().audio(recording, range)
 }
 
 /**
  * Checks the user can see the tenant's recordings, and loads the tenant's
- * account numbers and column settings.
+ * account numbers, column settings and how far back its history goes.
  */
 export async function requireRecordingAccess(event: H3Event, tenantId: string) {
   const access = await requireTenantRole(event, tenantId, 'viewer')
@@ -71,14 +77,16 @@ export async function requireRecordingAccess(event: H3Event, tenantId: string) {
     ...access,
     accountNumbers: accounts.map(account => account.accountNumber),
     available: normalizeColumns(access.tenant.recordingColumns ?? DEFAULT_AVAILABLE_COLUMNS),
-    accountDefault: access.tenant.recordingDefaultColumns ? normalizeColumns(access.tenant.recordingDefaultColumns) : null
+    accountDefault: access.tenant.recordingDefaultColumns ? normalizeColumns(access.tenant.recordingDefaultColumns) : null,
+    historyDays: access.tenant.recordingHistoryDays,
+    historyStart: recordingHistoryStart(access.tenant.recordingHistoryDays)
   }
 }
 
-/** Loads a recording that belongs to one of the tenant's account numbers, or 404s */
-export async function requireTenantRecording(id: string, accountNumbers: string[]) {
+/** Loads a recording that belongs to one of the tenant's account numbers and is within its history, or 404s */
+export async function requireTenantRecording(id: string, access: { accountNumbers: string[], historyStart: Date }) {
   const recording = await getRecording(id)
-  if (!recording || !accountNumbers.includes(recording.accountNumber)) {
+  if (!recording || !access.accountNumbers.includes(recording.accountNumber) || recording.startedAt < access.historyStart) {
     throw createError({ statusCode: 404, message: 'Recording not found' })
   }
   return recording
@@ -90,7 +98,6 @@ export function serializeRecording(recording: Recording, available: readonly Rec
     id: recording.id,
     startedAt: recording.startedAt.toISOString(),
     ani: available.includes('ani') ? recording.ani : undefined,
-    agent: available.includes('agent') ? recording.agent : undefined,
     accountNumber: available.includes('accountNumber') ? recording.accountNumber : undefined,
     durationSeconds: available.includes('duration') ? recording.durationSeconds : undefined
   }

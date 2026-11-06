@@ -3,11 +3,11 @@
 // the browser's download option isn't offered (recordings are listen-only).
 const props = defineProps<{
   src: string
-  waveformSrc: string
   autoplay?: boolean
 }>()
 
 const SPEEDS = [1, 1.25, 1.5, 2]
+const WAVEFORM_BARS = 72
 
 const audio = useTemplateRef<HTMLAudioElement>('audio')
 const playing = ref(false)
@@ -20,8 +20,24 @@ const speed = ref(1)
 const scrubbing = ref<number | null>(null)
 const position = computed(() => scrubbing.value ?? currentTime.value)
 
-// A flat waveform shows until this loads, or if it fails
-const { data: waveform } = useLazyFetch<{ peaks: number[] }>(() => props.waveformSrc, { server: false })
+// The waveform is drawn from the audio itself. A flat one shows until it's ready,
+// or if the browser can't decode it.
+const peaks = ref<number[] | null>(null)
+async function loadWaveform(src: string) {
+  peaks.value = null
+  let result: number[] = []
+  try {
+    result = await audioPeaks(await $fetch<ArrayBuffer>(src, { responseType: 'arrayBuffer' }), WAVEFORM_BARS)
+  } catch {
+    // Leave it flat
+  }
+  // A newer recording may have replaced this one meanwhile
+  if (src === props.src) {
+    peaks.value = result
+  }
+}
+onMounted(() => loadWaveform(props.src))
+watch(() => props.src, loadWaveform)
 
 function reset() {
   playing.value = false
@@ -139,7 +155,7 @@ defineExpose({ play, stop, toggle })
 
     <template v-else>
       <RecordingWaveform
-        :peaks="waveform?.peaks"
+        :peaks="peaks"
         :current="position"
         :duration="duration"
         :disabled="loading"

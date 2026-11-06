@@ -1,0 +1,27 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::822778518482:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+        },
+        "StringLike": {
+          "token.actions.githubusercontent.com:sub": [
+            "repo:kurtv-au@179181883/insight@1436401315:environment:production",
+            "repo:kurtv-au@179181883/insight@1436401315:ref:refs/tags/v*",
+            "repo:kurtv-au@179181883/insight@1436401315:ref:refs/heads/*",
+            "repo:kurtv-au/insight:environment:production",
+            "repo:kurtv-au/insight:ref:refs/tags/v*",
+            "repo:kurtv-au/insight:ref:refs/heads/*"
+          ]
+        }
+      }
+    }
+  ]
+}

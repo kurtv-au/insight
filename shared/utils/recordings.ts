@@ -3,13 +3,12 @@
  * to an account, owners and admins choose the account's defaults, and each user
  * picks their own from the available ones. Timestamp is always shown.
  */
-export const RECORDING_COLUMNS = ['timestamp', 'ani', 'agent', 'accountNumber', 'duration'] as const
+export const RECORDING_COLUMNS = ['timestamp', 'ani', 'accountNumber', 'duration'] as const
 export type RecordingColumn = typeof RECORDING_COLUMNS[number]
 
 export const RECORDING_COLUMN_LABELS: Record<RecordingColumn, string> = {
   timestamp: 'Timestamp',
   ani: 'Caller ID',
-  agent: 'Agent',
   accountNumber: 'Account #',
   duration: 'Duration'
 }
@@ -19,12 +18,20 @@ export interface RecordingDto {
   id: string
   startedAt: string
   ani?: string | null
-  agent?: string
   accountNumber?: string
   durationSeconds?: number
 }
 
 export const DEFAULT_AVAILABLE_COLUMNS: RecordingColumn[] = ['timestamp', 'ani', 'duration']
+
+/** How many days of recordings an account can load. Platform admins set it per account. */
+export const DEFAULT_RECORDING_HISTORY_DAYS = 365
+export const MAX_RECORDING_HISTORY_DAYS = 3650
+
+/** The earliest moment an account can load recordings from: a rolling window ending now */
+export function recordingHistoryStart(days: number, now = new Date()) {
+  return new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
+}
 
 export const SORT_DIRECTIONS = ['asc', 'desc'] as const
 export type SortDirection = typeof SORT_DIRECTIONS[number]
@@ -33,7 +40,6 @@ export type SortDirection = typeof SORT_DIRECTIONS[number]
 export const RECORDING_SORT_DEFAULTS: Record<RecordingColumn, SortDirection> = {
   timestamp: 'desc',
   ani: 'asc',
-  agent: 'asc',
   accountNumber: 'asc',
   duration: 'desc'
 }

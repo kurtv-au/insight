@@ -39,15 +39,27 @@ function safeDate(value: string | undefined) {
   }
 }
 
-const filters = computed(() => ({
-  q: queryString('q'),
-  from: safeDate(queryString('from')),
-  to: safeDate(queryString('to')),
-  min: Number(queryString('min')) || 0,
-  account: queryString('acct'),
-  page: Math.max(1, Math.floor(Number(queryString('page'))) || 1)
-}))
-const hasFilters = computed(() => !!(filters.value.q || filters.value.from || filters.value.min || filters.value.account))
+// With no dates in the URL the list shows today (quick to load from au-api);
+// "Any time" is range=all
+const todayDate = computed(() => today(timezone.value))
+function defaultRange() {
+  return { from: todayDate.value, to: todayDate.value }
+}
+
+const filters = computed(() => {
+  const from = safeDate(queryString('from'))
+  const to = safeDate(queryString('to'))
+  const anyTime = queryString('range') === 'all'
+  return {
+    q: queryString('q'),
+    ...(from || to ? { from, to } : anyTime ? { from: undefined, to: undefined } : defaultRange()),
+    datesChanged: !!(from || to) || anyTime,
+    min: Number(queryString('min')) || 0,
+    account: queryString('acct'),
+    page: Math.max(1, Math.floor(Number(queryString('page'))) || 1)
+  }
+})
+const hasFilters = computed(() => !!(filters.value.q || filters.value.datesChanged || filters.value.min || filters.value.account))
 
 // Sorting happens on the server. Only shown columns sort, so hiding the sorted
 // column goes back to newest first.
@@ -83,7 +95,7 @@ function updateQuery(patch: QueryPatch, { keepPage = false, replace = false } = 
 
 function clearFilters() {
   search.value = ''
-  updateQuery({ q: undefined, from: undefined, to: undefined, min: undefined, acct: undefined })
+  updateQuery({ q: undefined, from: undefined, to: undefined, range: undefined, min: undefined, acct: undefined })
 }
 
 // Calendar days become instants in the viewer's timezone; `to` is exclusive
@@ -99,11 +111,17 @@ const apiQuery = computed(() => ({
   dir: sort.value.direction
 }))
 
-const { data: results, status } = await useFetch(api, {
+// au-api can be slow, so the page opens straight away and the list loads in
+// the browser afterwards, with a loader meanwhile (as on the messages page)
+const { data: results, status, error: loadError, refresh } = useFetch(api, {
   query: apiQuery,
+  lazy: true,
+  server: false,
+  immediate: !!config.value?.hasAccountNumbers,
   default: () => ({ items: [] as RecordingDto[], total: 0 })
 })
-const loading = computed(() => status.value === 'pending')
+// 'idle' is the server render and the moment before the browser's first request
+const loading = computed(() => !!config.value?.hasAccountNumbers && (status.value === 'pending' || status.value === 'idle'))
 const pageCount = computed(() => Math.max(1, Math.ceil(results.value.total / PAGE_SIZE)))
 
 // Search, debounced so each keystroke doesn't add a request or history entry
@@ -118,46 +136,19 @@ watch(() => filters.value.q, (value) => {
     search.value = value ?? ''
   }
 })
-const searchPlaceholder = computed(() => {
-  const parts = [available.value.includes('ani') && 'caller ID', available.value.includes('agent') && 'agent'].filter(Boolean)
-  return parts.length ? `Search ${parts.join(' or ')}` : ''
-})
+const searchPlaceholder = computed(() => available.value.includes('ani') ? 'Search caller ID' : '')
 
 // Date range
-const todayDate = computed(() => today(timezone.value))
-const presets = computed(() => {
-  const t = todayDate.value
-  return [
-    { label: 'Today', from: t, to: t },
-    { label: 'Yesterday', from: t.subtract({ days: 1 }), to: t.subtract({ days: 1 }) },
-    { label: 'Last 7 days', from: t.subtract({ days: 6 }), to: t },
-    { label: 'Last 30 days', from: t.subtract({ days: 29 }), to: t }
-  ]
-})
-const dateOpen = ref(false)
-const shortDate = (date: CalendarDate) => formatDate(date.toDate(timezone.value), timezone.value).replace(/, \d{4}$/, '')
-const dateLabel = computed(() => {
-  const { from, to } = filters.value
-  if (!from || !to) {
-    return 'Any time'
-  }
-  const preset = presets.value.find(p => p.from.compare(from) === 0 && p.to.compare(to) === 0)
-  if (preset) {
-    return preset.label
-  }
-  return from.compare(to) === 0 ? shortDate(from) : `${shortDate(from)} – ${shortDate(to)}`
-})
-const calendarRange = computed({
-  get: () => ({ start: filters.value.from, end: filters.value.to }),
-  set: (range: { start?: CalendarDate, end?: CalendarDate } | null) => {
-    if (range?.start && range.end) {
-      setDates(range.start, range.end)
-    }
-  }
-})
+// The account's history is a rolling window; the server enforces it
+const historyDays = computed(() => config.value?.historyDays ?? DEFAULT_RECORDING_HISTORY_DAYS)
+const earliestDate = computed(() => todayDate.value.subtract({ days: historyDays.value }))
+// No dates means any time; the default range stays out of the URL
 function setDates(from?: CalendarDate, to?: CalendarDate) {
-  updateQuery({ from: from?.toString(), to: to?.toString() })
-  dateOpen.value = false
+  const { from: defaultFrom, to: defaultTo } = defaultRange()
+  const isDefault = from && to && from.compare(defaultFrom) === 0 && to.compare(defaultTo) === 0
+  updateQuery(from && to && !isDefault
+    ? { from: from.toString(), to: to.toString(), range: undefined }
+    : { from: undefined, to: undefined, range: isDefault ? undefined : 'all' })
 }
 
 const durationItems = [
@@ -245,11 +236,6 @@ const COLUMN_DEFS: Record<RecordingColumn, TableColumn<RecordingDto>> = {
     header: () => sortHeader('ani'),
     cell: ({ row }) => h('span', { class: ['whitespace-nowrap tabular-nums', !row.original.ani && 'text-muted'] }, formatPhone(row.original.ani))
   },
-  agent: {
-    id: 'agent',
-    header: () => sortHeader('agent'),
-    cell: ({ row }) => row.original.agent
-  },
   accountNumber: {
     id: 'accountNumber',
     header: () => sortHeader('accountNumber'),
@@ -282,8 +268,9 @@ watch(() => results.value.items[selectedIndex.value], (recording) => {
     linkedRecording.value = recording
   }
 })
-watch([selectedId, selectedIndex], async ([id, index]) => {
-  if (id && index === -1 && linkedRecording.value?.id !== id) {
+// Waits for the list, which usually has it
+watch([selectedId, selectedIndex, loading], async ([id, index, listLoading]) => {
+  if (id && index === -1 && !listLoading && linkedRecording.value?.id !== id) {
     try {
       linkedRecording.value = await requestFetch<RecordingDto>(`${api}/${encodeURIComponent(id)}`)
     } catch (err) {
@@ -370,46 +357,14 @@ function changePage(page: number) {
           :aria-label="searchPlaceholder"
         />
 
-        <UPopover
-          v-model:open="dateOpen"
-          :content="{ align: 'start' }"
-        >
-          <UButton
-            :label="dateLabel"
-            icon="i-lucide-calendar"
-            trailing-icon="i-lucide-chevron-down"
-            color="neutral"
-            variant="outline"
-          />
-          <template #content>
-            <div class="flex flex-col sm:flex-row">
-              <div class="flex flex-row flex-wrap gap-1 border-b border-default p-2 sm:flex-col sm:border-r sm:border-b-0">
-                <UButton
-                  v-for="preset in presets"
-                  :key="preset.label"
-                  :label="preset.label"
-                  color="neutral"
-                  :variant="dateLabel === preset.label ? 'soft' : 'ghost'"
-                  size="sm"
-                  @click="setDates(preset.from, preset.to)"
-                />
-                <UButton
-                  label="Any time"
-                  color="neutral"
-                  :variant="dateLabel === 'Any time' ? 'soft' : 'ghost'"
-                  size="sm"
-                  @click="setDates()"
-                />
-              </div>
-              <UCalendar
-                v-model="calendarRange"
-                range
-                :max-value="todayDate"
-                class="p-2"
-              />
-            </div>
-          </template>
-        </UPopover>
+        <DateRangeFilter
+          :from="filters.from"
+          :to="filters.to"
+          :timezone="timezone"
+          :earliest="earliestDate"
+          :note="`Recordings go back ${historyDays} ${historyDays === 1 ? 'day' : 'days'}.`"
+          @change="setDates"
+        />
 
         <USelect
           v-if="available.includes('duration')"
@@ -439,8 +394,26 @@ function changePage(page: number) {
         />
       </div>
 
-      <p class="mono-meta mt-6">
-        {{ results.total.toLocaleString('en-US') }} {{ results.total === 1 ? 'recording' : 'recordings' }}<template v-if="pageCount > 1">
+      <UAlert
+        v-if="loadError && !loading"
+        class="mt-6"
+        color="error"
+        variant="subtle"
+        icon="i-lucide-circle-alert"
+        :title="errorMessage(loadError, 'Couldn’t load recordings')"
+        description="Your filters are kept. Try again in a moment."
+        :actions="[{ label: 'Try again', color: 'neutral', variant: 'outline', icon: 'i-lucide-refresh-cw', onClick: () => refresh() }]"
+      />
+
+      <p
+        v-else
+        class="mono-meta mt-6"
+      >
+        <template v-if="loading">
+          Loading recordings…
+        </template><template v-else>
+          {{ results.total.toLocaleString('en-US') }} {{ results.total === 1 ? 'recording' : 'recordings' }}
+        </template><template v-if="!loading && pageCount > 1">
           · page {{ filters.page }} of {{ pageCount }}
         </template>
       </p>
@@ -455,9 +428,13 @@ function changePage(page: number) {
           :meta="tableMeta"
           :loading="loading"
           :get-row-id="(row: RecordingDto) => row.id"
-          :empty="hasFilters ? 'No recordings match these filters.' : 'No recordings yet.'"
+          :empty="loadError ? 'Recordings couldn’t be loaded.' : hasFilters ? 'No recordings match these filters.' : 'No recordings today.'"
           @select="(_e: Event, row: { original: RecordingDto }) => openRecording(row.original)"
-        />
+        >
+          <template #loading>
+            <TableLoading label="Loading recordings…" />
+          </template>
+        </UTable>
       </UCard>
 
       <div

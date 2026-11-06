@@ -2,6 +2,7 @@ import { relations } from 'drizzle-orm'
 import {
   boolean,
   datetime,
+  foreignKey,
   index,
   int,
   json,
@@ -9,12 +10,16 @@ import {
   mysqlTable,
   primaryKey,
   text,
+  uniqueIndex,
   varchar
 } from 'drizzle-orm/mysql-core'
 import { ROLES } from '../../shared/utils/roles.ts'
 import { TENANT_STATUSES } from '../../shared/utils/tenants.ts'
 import { DEFAULT_TIMEZONE } from '../../shared/utils/timezones.ts'
+import { DEFAULT_RECORDING_HISTORY_DAYS } from '../../shared/utils/recordings.ts'
 import type { RecordingColumn } from '../../shared/utils/recordings.ts'
+import { MESSAGE_FIELD_TYPES } from '../../shared/utils/messageFieldTypes.ts'
+import type { MessageFieldFormat } from '../../shared/utils/messageFields.ts'
 
 const id = () => varchar('id', { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID())
 const createdAt = () => datetime('created_at').notNull().$defaultFn(() => new Date())
@@ -31,6 +36,8 @@ export const tenants = mysqlTable('tenants', {
   recordingColumns: json('recording_columns').$type<RecordingColumn[]>(),
   // Columns members see until they choose their own; null means every available column
   recordingDefaultColumns: json('recording_default_columns').$type<RecordingColumn[]>(),
+  // Days of recordings the account can load, counting back from now; set by platform admins
+  recordingHistoryDays: int('recording_history_days').notNull().default(DEFAULT_RECORDING_HISTORY_DAYS),
   createdAt: createdAt(),
   updatedAt: updatedAt()
 })
@@ -81,6 +88,55 @@ export const userTenantPreferences = mysqlTable('user_tenant_preferences', {
   updatedAt: updatedAt()
 }, table => [
   primaryKey({ columns: [table.userId, table.tenantId] })
+])
+
+// How a tenant's messages page is set up: which account's active script its
+// fields come from, and the script as it was at the last save. Set by platform admins.
+export const tenantMessageSettings = mysqlTable('tenant_message_settings', {
+  tenantId: varchar('tenant_id', { length: 36 }).primaryKey().references(() => tenants.id, { onDelete: 'cascade' }),
+  // The account number (au-api client number) whose active script supplies the fields
+  scriptAccountNumber: varchar('script_account_number', { length: 32 }),
+  scriptId: int('script_id'),
+  scriptVersion: int('script_version'),
+  // Canonical (lower-cased) script field keys at the last save; fields not in it show as new
+  knownFieldKeys: json('known_field_keys').$type<string[]>(),
+  // Bumped on every save, so a stale editor can't overwrite a newer configuration
+  revision: int('revision').notNull().default(0),
+  updatedByUserId: varchar('updated_by_user_id', { length: 36 }).references(() => users.id, { onDelete: 'set null' }),
+  updatedAt: updatedAt()
+}, table => [
+  // Named explicitly: the generated name is longer than MySQL's 64-character limit
+  foreignKey({
+    name: 'tenant_message_settings_script_account_fk',
+    columns: [table.scriptAccountNumber],
+    foreignColumns: [tenantRecordingAccounts.accountNumber]
+  }).onDelete('set null')
+])
+
+// The script fields a tenant's messages page shows, keyed by the script's own field name.
+// Replaced as a whole on every save.
+export const tenantMessageFields = mysqlTable('tenant_message_fields', {
+  tenantId: varchar('tenant_id', { length: 36 }).notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  // The script's field name, as the script spells it; unique per tenant case-insensitively
+  fieldKey: varchar('field_key', { length: 128 }).notNull(),
+  label: varchar('label', { length: 255 }).notNull(),
+  type: mysqlEnum('type', MESSAGE_FIELD_TYPES).notNull(),
+  format: json('format').$type<MessageFieldFormat>().notNull(),
+  // `order` is a reserved word in SQL
+  position: int('position').notNull(),
+  showInList: boolean('show_in_list').notNull().default(true),
+  showInDetail: boolean('show_in_detail').notNull().default(true),
+  isActive: boolean('is_active').notNull().default(true),
+  // Not in the source script at the last save; hidden from the messages page unless showIfOrphaned
+  orphaned: boolean('orphaned').notNull().default(false),
+  showIfOrphaned: boolean('show_if_orphaned').notNull().default(false),
+  sourceScriptId: int('source_script_id'),
+  sourceScriptVersion: int('source_script_version'),
+  updatedByUserId: varchar('updated_by_user_id', { length: 36 }).references(() => users.id, { onDelete: 'set null' }),
+  updatedAt: updatedAt()
+}, table => [
+  primaryKey({ columns: [table.tenantId, table.fieldKey] }),
+  uniqueIndex('tenant_message_fields_tenant_position_uq').on(table.tenantId, table.position)
 ])
 
 export const invitations = mysqlTable('invitations', {
