@@ -89,7 +89,7 @@ its own pieces:
 | VPC | `vpc-31166a54` (default, `172.31.0.0/16`, no NAT gateway) |
 | Instance | t4g.small, Name `insight.answerunited.net`, tag `App=insight`, subnet `subnet-d37ca5f8` (us-east-1b, public IP for outbound only) |
 | Load balancer | the shared **`AU-LB`**: HTTPS listener rule `insight.answerunited.net` (priority 90) → target group `insight-answerunited-net`. Uses the `*.answerunited.net` certificate already on the listener |
-| Security groups | `insight-web` (80 from `AU-LB`'s `BasicWeb` `sg-f689c092`), `insight-db` (3306 from `insight-web`) |
+| Security groups | `insight-web` (80 from `AU-LB`'s `BasicWeb` `sg-f689c092`), `insight-db` (3306 from `insight-web`, and from the Kalamazoo office VPN `172.24.24.0/22`; see section 2) |
 | Database | new RDS MySQL 8.4 `insight-v2` (db.t4g.micro, private, encrypted, 7-day backups), database `insight`. The older `insight` RDS server (MySQL 5.7) belongs to the previous Insight and isn't used |
 | DNS | `insight.answerunited.net` alias `A` → `AU-LB`, in the `answerunited.net` zone |
 | Bucket | `au-insight-releases` |
@@ -330,15 +330,52 @@ console.log('Created the insight user on MySQL', v.version)
 await c.end()
 EOF
 node setup.mjs
-echo "NUXT_DATABASE_URL=mysql://insight:$APP_PW@$DB_HOST:3306/insight?ssl=Amazon%20RDS"
 cd / && rm -rf /tmp/dbsetup
 ```
 
-Keep the printed `NUXT_DATABASE_URL` line for the environment file (next
-section). The password is hex, so it needs no URL-encoding. The DDL rights are
+Stay in this shell: section 4 writes the environment file from `$APP_PW` and
+`$DB_HOST`. Don't `echo` them. Session Manager streams everything a session
+prints to CloudWatch (`/ssm/sessions`), and text typed at a `read -s` prompt
+is the only input that isn't printed. The password is hex, so it needs no
+URL-encoding. The DDL rights are
 for migrations, which `deploy/activate.sh` runs on every deploy. `?ssl=Amazon%20RDS`
 turns on TLS, verified against mysql2's bundled Amazon RDS CA bundle; the app
 and `migrate.mjs` read the URL the same way.
+
+### Connecting from the office (DataGrip and similar)
+
+The database is private, so it is reached over the Kalamazoo site-to-site VPN
+(`Kalamazoo_ATT50`, `172.24.24.0/22`, routed to the VPC by `vgw-da03e1b3`).
+The VPN keeps your own address, so `insight-db` allows MySQL from that range.
+That is the only rule besides the instance's:
+
+```bash
+aws ec2 authorize-security-group-ingress --group-id sg-0e82272f8fecdecb9 --ip-permissions \
+  'IpProtocol=tcp,FromPort=3306,ToPort=3306,IpRanges=[{CidrIp=172.24.24.0/22,Description="Kalamazoo office (site-to-site VPN)"}]'
+nc -vz -G 5 insight-v2.cv1n7igbuyzt.us-east-1.rds.amazonaws.com 3306      # from the office network
+```
+
+Remote access over OpenVPN is different, because the OpenVPN server
+translates clients to its own VPC address. That needs a rule from its
+security group (`sg-008811c59ff2fd609`) instead.
+
+In the client:
+- **Host:** `insight-v2.cv1n7igbuyzt.us-east-1.rds.amazonaws.com`, port 3306, database `insight`.
+- **SSL** on, mode *Verify CA*, with the RDS bundle as the CA file
+  (`curl -so ~/certs/rds-global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem`).
+  Every account requires TLS.
+- **User:** your own, not `insight_admin`. Secrets Manager rotates the admin
+  password every 7 days, so a saved one stops working. Create a personal
+  user once, as `insight_admin` (current password from `aws secretsmanager
+  get-secret-value`; single-quote the ARN, since zsh reads its `!`):
+
+  ```sql
+  CREATE USER 'kurt'@'%' IDENTIFIED BY '<a strong password>' REQUIRE SSL;
+  GRANT SELECT ON insight.* TO 'kurt'@'%';      -- or ALL PRIVILEGES to make changes
+  ```
+
+Never use the app's own `insight` user from a client. Its password lives
+only in `shared/.env`.
 
 ## 3. Email (SES)
 
@@ -354,26 +391,32 @@ after the response.
 
 ## 4. Environment file
 
-Open a shell on the instance with SSM Session Manager (`aws ssm start-session
---target i-… --document-name Insight-Session`, then `sudo -i`), and:
+In the same root shell as section 2, so `$APP_PW` and `$DB_HOST` are still
+set. Nothing secret is printed:
 
 ```bash
-sudo install -m 600 /dev/null /opt/insight/shared/.env
-sudo vi /opt/insight/shared/.env
-```
-
-```bash
-NUXT_DATABASE_URL=mysql://insight:…@insight-v2.….us-east-1.rds.amazonaws.com:3306/insight?ssl=Amazon%20RDS   # printed in section 2
-NUXT_SESSION_PASSWORD=…                      # new: openssl rand -hex 32, never the dev one
-NUXT_PUBLIC_APP_URL=https://insight.answerunited.net   # builds the links in emails
+read -rsp 'au-api insight-prod key: ' AU_KEY; echo     # never a customer's key, or insight-dev
+install -m 600 /dev/null /opt/insight/shared/.env
+cat > /opt/insight/shared/.env <<EOF
+NUXT_DATABASE_URL=mysql://insight:$APP_PW@$DB_HOST:3306/insight?ssl=Amazon%20RDS
+NUXT_SESSION_PASSWORD=$(openssl rand -hex 32)
+NUXT_PUBLIC_APP_URL=https://insight.answerunited.net
 NUXT_EMAIL_TRANSPORT=ses
 NUXT_EMAIL_FROM="Insight <no-reply@answerunited.com>"
 NUXT_AWS_REGION=us-east-1
-NUXT_SUPPORT_EMAIL=custserv@answerunited.com # receives the support form
+NUXT_SUPPORT_EMAIL=custserv@answerunited.com
 NUXT_AU_API_URL=https://api.answerunited.net
-NUXT_AU_API_KEY=…                            # the insight-prod key, never a customer's or insight-dev
-# no AWS keys: the instance role sends email
+NUXT_AU_API_KEY=$AU_KEY
+EOF
+ls -l /opt/insight/shared/.env                 # -rw------- root root
+cut -d= -f1 /opt/insight/shared/.env           # the 9 key names
+grep -c '=$' /opt/insight/shared/.env          # 0: nothing left empty
+unset ADMIN_PW APP_PW AU_KEY DB_HOST
 ```
+
+`NUXT_PUBLIC_APP_URL` builds the links in emails. There are no AWS keys,
+because the instance role sends email. To change a value later, edit the file
+with `sudo vi` and see "Changing the environment" below.
 
 `activate.sh` refuses to deploy unless the file is mode 600, has every
 required key, has a session password of at least 32 characters, and has an
