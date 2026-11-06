@@ -617,8 +617,31 @@ What it does:
    unset NUXT_DATABASE_URL DBPASS DBPASS_URL
    ```
 
-4. Afterwards:
-   - Assign an owner per tenant in `/admin/tenants`, and configure its
-     message fields.
+4. Message fields. `scripts/import-v1-fields.ts` builds each imported tenant's
+   message-field configuration from `dynamic_fields.csv` and the account's
+   live au-api script:
+   - v1 target 1 becomes the list columns, and target 2 the detail view, with
+     its order and captions. Target 3 (a stale secondary copy) is ignored.
+   - Each field is matched to the script case-insensitively, stored under the
+     script's spelling, and given the type the editor would pick. v1 fields
+     the script no longer has are left out and listed.
+   - Tenants that already have a configuration are skipped, so re-running is
+     safe.
+   - The result is the same as a first save in the editor: revision 1, with
+     no drift.
+
+   It needs `NUXT_AU_API_KEY` (from `.env`, or exported) as well as the
+   database URL from step 3. `SELECT ... FOR UPDATE` also needs `UPDATE` on
+   the database user, which `ALL PRIVILEGES` covers. In the same shell, before
+   the `unset`:
+
+   ```bash
+   pnpm import:v1-fields v1-accounts           # dry run: per-tenant fields and anything left out
+   pnpm import:v1-fields v1-accounts --apply   # one transaction
+   ```
+
+5. Afterwards:
+   - Assign an owner per tenant in `/admin/tenants`, and check its message
+     fields.
    - Enable the disabled users when agreed.
    - Delete the export from your laptop.
