@@ -241,8 +241,8 @@
   --ink-switch-track: rgba(23, 26, 32, 0.2);
   --ink-switch-thumb: #ffffff;
   --ink-field-line: color-mix(in srgb, var(--ui-border) 60%, transparent);
-  --ink-avatar: #a87795;
-  --ink-avatar-ink: #180e08;
+  --ink-avatar: var(--ui-primary);
+  --ink-avatar-ink: var(--ui-text-inverted);
   --ink-scrim: rgba(247, 247, 248, 0.85);
   --ink-code-bg: #ffffff;
   --ink-banner-from: #ffffff;
