@@ -12,6 +12,20 @@ const { formatDate } = useTimezone()
 const { data: tenants, refresh } = await useFetch('/api/admin/tenants', { default: () => [] })
 type Tenant = typeof tenants.value[number]
 
+// Narrow the list by any part of the account name
+const search = ref('')
+const filteredTenants = computed(() => {
+  const needle = search.value.trim().toLowerCase()
+  return needle ? tenants.value.filter(tenant => tenant.name.toLowerCase().includes(needle)) : tenants.value
+})
+const tenantCount = computed(() => {
+  const total = tenants.value.length
+  if (!total) {
+    return undefined
+  }
+  return filteredTenants.value.length === total ? `${total}` : `${filteredTenants.value.length} of ${total}`
+})
+
 async function setStatus(tenant: Tenant, status: TenantStatus) {
   if (await setTenantStatus(tenant, status)) {
     await refresh()
@@ -222,15 +236,23 @@ async function onInviteOwner(event: FormSubmitEvent<z.output<typeof inviteSchema
       <SectionKicker
         number="01"
         label="Accounts"
-        :count="tenants.length ? `${tenants.length}` : undefined"
+        :count="tenantCount"
         class="mb-3"
       />
-      <div
+      <UInput
         v-if="tenants.length"
+        v-model="search"
+        icon="i-lucide-search"
+        placeholder="Search accounts"
+        aria-label="Search accounts"
+        class="mb-3 w-full sm:w-64"
+      />
+      <div
+        v-if="filteredTenants.length"
         class="divide-y divide-muted rounded-standard border border-default"
       >
         <div
-          v-for="tenant in tenants"
+          v-for="tenant in filteredTenants"
           :key="tenant.id"
           class="flex items-center gap-3 px-4 py-3"
         >
@@ -278,6 +300,12 @@ async function onInviteOwner(event: FormSubmitEvent<z.output<typeof inviteSchema
           </UDropdownMenu>
         </div>
       </div>
+      <p
+        v-else-if="tenants.length"
+        class="text-body-sm text-muted"
+      >
+        No accounts match “{{ search.trim() }}”.
+      </p>
       <div
         v-else
         class="flex flex-col items-start gap-4"
