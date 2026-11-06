@@ -15,7 +15,7 @@ interface ApiScriptField {
   screens: string[]
 }
 
-interface ApiActiveScript {
+export interface ApiActiveScript {
   scriptId: number
   name: string
   versionNumber: number
@@ -25,7 +25,7 @@ interface ApiActiveScript {
 }
 
 /** Explicit projection, so nothing au-api adds later reaches the browser unreviewed */
-function toDto(script: ApiActiveScript): ActiveScriptDto {
+export function toActiveScriptDto(script: ApiActiveScript): ActiveScriptDto {
   return {
     scriptId: script.scriptId,
     name: script.name,
@@ -58,6 +58,6 @@ export const auApiScripts: ScriptSource = {
     if (!result) {
       return { status: 'unknown_account' }
     }
-    return result.data.script ? { status: 'ok', script: toDto(result.data.script) } : { status: 'no_script' }
+    return result.data.script ? { status: 'ok', script: toActiveScriptDto(result.data.script) } : { status: 'no_script' }
   }
 }

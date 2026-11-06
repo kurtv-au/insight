@@ -13,8 +13,8 @@
  * tests and drizzle-kit can load this file on its own.
  */
 import { z } from 'zod'
-import { formatPhone } from './recordings'
-import { accountNumberSchema } from './schemas'
+import { formatPhone } from './recordings.ts'
+import { accountNumberSchema } from './schemas.ts'
 import type { MessageFieldType } from './messageFieldTypes'
 
 /** More than any script has; keeps a tenant's config a sane size. */
