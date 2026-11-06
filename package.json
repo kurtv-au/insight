@@ -17,7 +17,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
-    "admin:create": "node scripts/create-admin.ts"
+    "admin:create": "node scripts/create-admin.ts",
+    "import:v1": "node scripts/import-v1.ts"
   },
   "dependencies": {
     "@aws-sdk/client-sesv2": "^3.1157.0",
