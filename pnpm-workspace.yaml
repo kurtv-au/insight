@@ -4,3 +4,12 @@ allowBuilds:
   esbuild: false
   unrs-resolver: false
   vue-demi: false
+
+# Platform binaries (esbuild, rollup, lightningcss, tailwind's oxide) for every
+# host that builds this app — Linux CI runners and the offline release
+# container, and Macs — so one pnpm store (scripts/build-cache.sh) installs
+# offline on all of them. See docs/DEPLOYMENT.md "Offline builds".
+supportedArchitectures:
+  os: [current, linux, darwin]
+  cpu: [current, x64, arm64]
+  libc: [current, glibc]

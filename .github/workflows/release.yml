@@ -1,0 +1,179 @@
+name: release
+
+# Builds a release offline from the S3 build cache and deploys it to the EC2
+# instance tagged App=insight over SSM. See docs/DEPLOYMENT.md.
+#
+#   push a tag v*            build and deploy that tag
+#   Run workflow (by hand)   build and deploy the chosen branch or tag
+#
+# Repository variables: AWS_REGION, AWS_ROLE_ARN, ARTIFACT_BUCKET.
+# The deploy job uses the `production` environment, so required reviewers set
+# on it in GitHub become an approval gate.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Version
+        id: version
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            VERSION="$GITHUB_REF_NAME"
+            # The tag must name the version package.json declares, so the two
+            # cannot drift: bump package.json, commit, then tag that commit.
+            DECLARED="v$(jq -r .version package.json)"
+            if [ "$VERSION" != "$DECLARED" ]; then
+              echo "::error::Tag $VERSION does not match package.json ($DECLARED). Bump the version, commit, and tag that commit."
+              exit 1
+            fi
+          else
+            VERSION="$(echo "$GITHUB_REF_NAME" | tr -c 'A-Za-z0-9._-' '-' | sed 's/-*$//')-$(git rev-parse --short=10 HEAD)"
+          fi
+          # It becomes a path and part of a root shell command on the instance;
+          # a tag may legally contain `;`, `$` or backticks.
+          if ! [[ "$VERSION" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "::error::Version '$VERSION' may contain only letters, digits, '.', '_' and '-'."
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Release $VERSION"
+
+      - name: AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      # Releases are immutable: a version already in S3 is deployed as it is,
+      # not rebuilt. That is what makes re-running a release (or running it for
+      # the current version, onto a replacement instance) re-activate it.
+      - name: Already built?
+        id: built
+        env:
+          BUCKET: ${{ vars.ARTIFACT_BUCKET }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if aws s3 ls "s3://$BUCKET/insight/releases/$VERSION.tar.gz" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "### \`$VERSION\` is already in S3; deploying it as built" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Fetch the build cache
+        if: steps.built.outputs.exists != 'true'
+        env:
+          BUCKET: ${{ vars.ARTIFACT_BUCKET }}
+        run: |
+          KEY="$(bash scripts/build-cache.sh key)"
+          OBJECT="s3://$BUCKET/insight/build-cache/$KEY.tar.gz"
+          if ! aws s3 cp "$OBJECT" "$RUNNER_TEMP/build-cache.tar.gz"; then
+            echo "::error::No build cache $KEY in S3. Run the build-cache workflow for this ref, then re-run this one."
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/cache"
+          tar -xzf "$RUNNER_TEMP/build-cache.tar.gz" -C "$RUNNER_TEMP/cache"
+
+      # The whole install and build run with no network at all. Anything that
+      # tries to download fails the release rather than quietly succeeding.
+      - name: Build (offline)
+        if: steps.built.outputs.exists != 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/out"
+          docker run --rm --network none \
+            -v "$GITHUB_WORKSPACE":/src:ro \
+            -v "$RUNNER_TEMP/cache":/cache \
+            -v "$RUNNER_TEMP/out":/out \
+            ubuntu:24.04 bash /src/scripts/build-release.sh /cache "$VERSION" /out
+
+      - name: Upload the release
+        if: steps.built.outputs.exists != 'true'
+        env:
+          BUCKET: ${{ vars.ARTIFACT_BUCKET }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          OBJECT="s3://$BUCKET/insight/releases/$VERSION.tar.gz"
+          if aws s3 ls "$OBJECT" >/dev/null 2>&1; then
+            echo "::error::$OBJECT appeared while this run was building. Releases are immutable; re-run to deploy it."
+            exit 1
+          fi
+          aws s3 cp "$RUNNER_TEMP/out/insight-$VERSION.tar.gz" "$OBJECT"
+          echo "### Built \`$VERSION\` ($(du -h "$RUNNER_TEMP/out/insight-$VERSION.tar.gz" | cut -f1))" >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Activate on the instance (SSM)
+        env:
+          BUCKET: ${{ vars.ARTIFACT_BUCKET }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          # Checked again here because it is spliced into a root shell script.
+          [[ "$VERSION" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "::error::bad version"; exit 1; }
+          # Download, extract into releases/<version>, and run that release's
+          # own activate.sh. Re-running an existing version just re-activates it.
+          SCRIPT=$(cat <<EOF
+          set -euo pipefail
+          DIR=/opt/insight/releases/$VERSION
+          if [ ! -d "\$DIR" ]; then
+            aws s3 cp "s3://$BUCKET/insight/releases/$VERSION.tar.gz" "/tmp/insight-$VERSION.tar.gz"
+            mkdir -p "\$DIR.partial"
+            tar -xzf "/tmp/insight-$VERSION.tar.gz" -C "\$DIR.partial"
+            mv "\$DIR.partial" "\$DIR"
+            rm -f "/tmp/insight-$VERSION.tar.gz"
+          fi
+          bash "\$DIR/deploy/activate.sh"
+          EOF
+          )
+          PARAMS=$(jq -n --arg s "$SCRIPT" '{commands: ["bash -c " + ($s | @sh)], executionTimeout: ["900"]}')
+          CMD=$(aws ssm send-command \
+            --document-name AWS-RunShellScript \
+            --targets Key=tag:App,Values=insight \
+            --comment "insight $VERSION" \
+            --parameters "$PARAMS" \
+            --query Command.CommandId --output text)
+          echo "SSM command $CMD"
+
+          STATUS=Pending
+          for _ in $(seq 1 120); do
+            sleep 10
+            STATUS=$(aws ssm list-commands --command-id "$CMD" --query 'Commands[0].Status' --output text)
+            case "$STATUS" in Pending|InProgress|Delayed) continue ;; *) break ;; esac
+          done
+
+          aws ssm list-command-invocations --command-id "$CMD" --details \
+            --query 'CommandInvocations[].CommandPlugins[].Output' --output text
+          echo "Status: $STATUS"
+          if [ "$STATUS" != Success ]; then
+            echo "::error::Activation $STATUS. If the health check failed, the previous release is serving again (see output above)."
+            exit 1
+          fi
+          echo "### Deployed \`$VERSION\`" >> "$GITHUB_STEP_SUMMARY"

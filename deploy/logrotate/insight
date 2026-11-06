@@ -1,0 +1,14 @@
+# PM2's logs for insight. Installed to /etc/logrotate.d/insight
+# (docs/DEPLOYMENT.md). The system logrotate rather than pm2-logrotate, which
+# is a resident Node process of its own (~70 MB) on an instance sized for one.
+# copytruncate because PM2 keeps the files open.
+/root/.pm2/logs/*.log {
+    daily
+    maxsize 50M
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}

@@ -47,6 +47,15 @@ CI (`.github/workflows/ci.yml`) runs lint, typecheck and the Vitest unit tests, 
 - au-api limits: at most 50 fields per request (saves cap active fields at 50), names matching `RETRIEVABLE_FIELD_KEY`, and at most 7 days per request. Ranges come from the page as calendar days, so a week across DST is split into windows (`splitRange()`/`paginateWindows()`).
 - The insight key spans every client: a single message must be checked against the tenant's own account numbers (and its history window, which is the recordings setting) before it's returned.
 
+## Deployment
+
+- `docs/DEPLOYMENT.md` is the runbook: EC2 behind an ALB (TLS ends at the ALB), nginx on port 80, PM2, releases built offline in GitHub Actions and activated over SSM by `deploy/activate.sh`. Keep it in sync with `deploy/`, `scripts/build-*.sh`, `ecosystem.config.cjs` and the workflows.
+- Release by bumping `package.json` `version` and pushing the matching `vX.Y.Z` tag. Versions already in S3 are never rebuilt.
+- Migrations run before the switch and are never reversed on rollback, so they must be additive: the previous release has to keep working against the new schema.
+- `/api/health` must stay free of database and au-api calls (it's the ALB health check and the deploy check).
+- Builds run with no network: nothing may be fetched at build time (fonts are self-hosted in `public/fonts/`). A new dependency changes the build-cache key; the `build-cache` workflow refreshes it.
+- Behind the ALB, nginx replaces `X-Forwarded-For` with the real client address (rate limits read the first entry) and passes `Host` and `X-Forwarded-Proto` through (passkeys depend on them).
+
 ## Design
 
 Use the semantic Nuxt UI utilities (`bg-default`, `text-muted`, `border-default`, …) and the tokens in `app/assets/css/main.css` so light and dark mode both work. Component overrides live in `app/app.config.ts`. Reuse the primitives in `app/components` (`PageHeader`, `SectionKicker`, `AsideNote`, `IconTile`, …) before building new ones. Custom classes must be declared as `@utility` in `main.css`, or lint fails.

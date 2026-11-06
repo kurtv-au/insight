@@ -17,7 +17,7 @@ Insight is the web portal for Answer United customers to access their messages a
 
 ## Prerequisites
 
-- Node.js 22.18+ (CI uses Node 24)
+- Node.js 22.18+ (`.node-version` pins what CI, release builds and production use)
 - pnpm
 - Docker (for the local MySQL database), or any MySQL 8 server
 - For sending real email: an AWS account with a verified SES sender identity
@@ -45,6 +45,8 @@ Insight is the web portal for Answer United customers to access their messages a
    | `NUXT_EMAIL_FROM` | Sender address (must be verified in SES) |
    | `NUXT_SUPPORT_EMAIL` | Address that receives messages from the support form. Replies go to the sender |
    | `NUXT_AWS_REGION` | SES region. Credentials come from the standard AWS chain (env vars, `AWS_PROFILE`, or an IAM role) |
+   | `NUXT_AU_API_URL` | au-api, the source of recordings, message scripts and messages (default `https://api.answerunited.net`) |
+   | `NUXT_AU_API_KEY` | This environment's insight key for au-api. Leave it empty in development to use mock data; production returns 503 without it |
    | `MYSQL_PORT` | Optional host port for the Docker database (default `3306`) |
 
 3. Start MySQL and apply the database migrations:
@@ -126,7 +128,7 @@ Tenant pages live under `/t/[slug]`, and tenant APIs under `/api/tenants/[tenant
 Insight shares its "ink" theme with docu-script: ink neutrals, Bricolage Grotesque headings and Spline Sans Mono labels. The primary color, `cobalt`, is the Answer United logo blue (`#16348c`, lightened in dark mode for contrast). Light mode, the default, uses neutral gray and white surfaces; dark mode keeps the ink palette. Each user can switch from the account menu.
 
 - **Tokens** live in `app/assets/css/main.css`: color ramps, fonts, radii, the type scale, app tokens such as `bg-sidebar` and `text-cobalt-text`, and utilities such as `kicker`, `mono-meta` and `hairline`. Prefer the semantic utilities (`bg-default`, `bg-muted`, `bg-elevated`, `text-highlighted`, `text-muted`, `border-default`) so both color modes keep working.
-- **Component styles** (pill buttons, cards, modals, inputs) are overridden in `app/app.config.ts`. Fonts are loaded from `nuxt.config.ts`.
+- **Component styles** (pill buttons, cards, modals, inputs) are overridden in `app/app.config.ts`. Fonts are self-hosted: variable woff2 files in `public/fonts/`, declared with `@font-face` at the top of `main.css` (`@nuxt/fonts` is off, so builds don't fetch them).
 - **Shell:** a left icon rail on desktop (`AppRail`) and a bottom tab bar on mobile (`AppTabbar`), sharing their items through `useAppNav()`.
 - **Logos:** `AppLogo` shows the full Answer United logo, swapping `public/images/answer-logo-light-mode.png` and `answer-logo-dark-mode.png` by color mode. `AppMark` is the AU square from the favicon, used in the rail. `public/apple-touch-icon.png` is `favicon.ico` resized to 180px and flattened onto white.
 - **Primitives:** `PageHeader`, `AuthHeading`, `SectionKicker`, `AsideNote`, `IconTile`, `InkUnderline`, `AppLogo` and `AppMark`. Check these before building new ones.
@@ -146,19 +148,16 @@ These also run in CI on every push (see `.github/workflows/ci.yml`).
 
 ## Production
 
-Build the application for production:
+Insight runs at `https://insight.answerunited.net`: one EC2 instance behind an ALB, with nginx and PM2 on the box and MySQL on RDS. GitHub Actions builds each release offline and deploys it over SSM: push a `vX.Y.Z` tag matching `package.json`'s version. [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) is the runbook, covering the AWS setup, the environment file, the first deploy, releasing, rolling back and day-to-day operations.
+
+Migrations run on every deploy, before the new release starts, and are never reversed on rollback, so each one must keep the previous release working.
+
+To try a production build locally:
 
 ```bash
 pnpm build
-```
-
-Preview the production build locally:
-
-```bash
 pnpm preview
 ```
-
-See the [Nuxt deployment documentation](https://nuxt.com/docs/getting-started/deployment) for hosting options.
 
 ## Dependency Updates
 
