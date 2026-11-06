@@ -345,7 +345,12 @@ and `migrate.mjs` read the URL the same way.
 Already in place: in SES **us-east-1** (`NUXT_AWS_REGION`), `answerunited.com`
 is verified and the account has production access. Sign-in links,
 invitations, password resets and the support form all send from
-`no-reply@answerunited.com`, which the instance role is limited to.
+`no-reply@answerunited.com`, which the instance role is limited to. The
+`answerunited.com` identity has a default configuration set, `Bounce_Tracking`,
+and SES checks the sender's permission on that too, so the role allows both
+(`deploy/aws/ec2-permissions.json`). Without it every send fails with an
+access error that only appears in the app log, because sign-in emails are sent
+after the response.
 
 ## 4. Environment file
 
