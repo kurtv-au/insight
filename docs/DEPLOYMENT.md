@@ -561,3 +561,64 @@ Nothing on it is unique except `shared/.env`. To replace it:
 4. Install nginx as in section 5, step 3.
 5. Register the new instance in the `insight-answerunited-net` target group
    and deregister the old one.
+
+### One-off v1 import
+
+`scripts/import-v1.ts` copies accounts and users from the original Insight's
+CSV export (`accounts.csv`, `users.csv`, `users_messagefilters.csv`) into the
+database. It runs from your laptop over the office VPN, not on the instance.
+That keeps customer data out of the release and out of the Session Manager
+logs. The export folder is gitignored (`/v1-accounts/`).
+
+What it does:
+- Each v1 account becomes an **active** tenant with 365 days of history and
+  its recordings client number. If it has no client number, its v1 account
+  number is used.
+- An account whose client numbers are a range (Answer United's
+  `1-9999999999`) is skipped with its users. Make staff platform admins with
+  `admin:create` instead.
+- Each user becomes a **viewer** of their account, with no password. They
+  sign in with "Email me a sign-in link".
+- No email is sent. Owners are assigned afterwards from each tenant's members
+  page.
+- Users who had v1 message filters are imported **disabled**, because Insight
+  has no per-user filters and they would see all of the account's messages.
+  Enable them one by one once that's agreed.
+- Message fields, message filters, locations and v1 passwords are not
+  imported.
+- Validation errors stop the import before anything is written.
+- Output is counts and v1 ids only.
+- Re-running reuses what's already there. A tenant whose slug or account
+  number belongs to something else is a conflict and stops the import.
+
+1. Try it locally first. Run `pnpm import:v1 v1-accounts`, which is a dry
+   run, then `pnpm import:v1 v1-accounts --apply` against the docker
+   database.
+2. Take a manual RDS snapshot of `insight-v2`. That snapshot is the undo.
+3. From the office network, run it with your personal user (see
+   "Connecting from the office"; it needs `ALL PRIVILEGES`, or at least
+   `SELECT, INSERT` on `insight.*`). A `NUXT_DATABASE_URL` set on the command
+   line wins over `.env`. The password must be URL-encoded (RDS passwords
+   often contain `/`), so let Node do it. `read -s` keeps it out of the shell
+   history and the screen. The dry run prints the host it's using; check it
+   and the counts before applying:
+
+   ```bash
+   read -s DBPASS
+   DBPASS_URL=$(printf %s "$DBPASS" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(encodeURIComponent(s)))')
+   export NUXT_DATABASE_URL="mysql://kurt:$DBPASS_URL@insight-v2.cv1n7igbuyzt.us-east-1.rds.amazonaws.com:3306/insight?ssl=Amazon%20RDS"
+   pnpm import:v1 v1-accounts           # dry run
+   ```
+
+   Then, once the counts look right, in the same shell:
+
+   ```bash
+   pnpm import:v1 v1-accounts --apply   # one transaction
+   unset NUXT_DATABASE_URL DBPASS DBPASS_URL
+   ```
+
+4. Afterwards:
+   - Assign an owner per tenant in `/admin/tenants`, and configure its
+     message fields.
+   - Enable the disabled users when agreed.
+   - Delete the export from your laptop.
