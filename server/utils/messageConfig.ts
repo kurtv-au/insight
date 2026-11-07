@@ -34,6 +34,15 @@ export async function loadMessageConfig(tenantId: string) {
   return { settings: settings ?? null, fields: rows.map(toSavedField) }
 }
 
+/** How the account shows when a message was received; the default until message fields are first saved */
+export async function messageReceivedSetting(tenantId: string): Promise<MessageReceivedSetting> {
+  const settings = await useDb().query.tenantMessageSettings.findFirst({
+    where: eq(tables.tenantMessageSettings.tenantId, tenantId),
+    columns: { receivedInList: true, receivedInDetail: true }
+  })
+  return settings ? { showInList: settings.receivedInList, showInDetail: settings.receivedInDetail } : { ...DEFAULT_MESSAGE_RECEIVED }
+}
+
 /** The fields the messages page shows, without admin-only state */
 export async function visibleMessageFields(tenantId: string): Promise<MessageColumnField[]> {
   const { fields } = await loadMessageConfig(tenantId)
@@ -75,6 +84,7 @@ export async function adminMessageConfig(tenantId: string) {
       scriptVersion: settings?.scriptVersion ?? null,
       knownFieldKeys: settings?.knownFieldKeys ?? [],
       revision: settings?.revision ?? 0,
+      received: settings ? { showInList: settings.receivedInList, showInDetail: settings.receivedInDetail } : { ...DEFAULT_MESSAGE_RECEIVED },
       updatedAt: settings?.updatedAt.toISOString() ?? null,
       updatedBy: updatedBy ? (updatedBy.name || updatedBy.email) : null
     },
@@ -109,6 +119,7 @@ export async function saveMessageFieldConfig(input: {
   revision: number
   scriptAccountNumber: string | null
   fields: MessageFieldInput[]
+  received: MessageReceivedSetting
   script: ActiveScriptDto | null
 }) {
   const { tenantId, script } = input
@@ -136,6 +147,8 @@ export async function saveMessageFieldConfig(input: {
         // Without a script there's nothing new to compare with next time; keep what we knew
         knownFieldKeys: script ? [...inScript] : (current?.knownFieldKeys ?? []),
         revision: (current?.revision ?? 0) + 1,
+        receivedInList: input.received.showInList,
+        receivedInDetail: input.received.showInDetail,
         updatedByUserId: input.userId
       }
       if (current) {

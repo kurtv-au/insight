@@ -5,9 +5,11 @@ const props = defineProps<{
   /** The fields as they'd show on the messages page: visible ones, in order */
   fields: MessageColumnField[]
   timeZone: string
+  /** Received as a list column (the account's default); shown unless false */
+  received?: boolean
 }>()
 
-const columns = computed(() => buildMessageColumns(props.fields, { timeZone: props.timeZone }))
+const columns = computed(() => buildMessageColumns(props.fields, { timeZone: props.timeZone, received: props.received !== false }))
 // No list columns means nothing to preview, rather than rows of dates alone
 const rows = computed(() => {
   const shown = listFields(props.fields)

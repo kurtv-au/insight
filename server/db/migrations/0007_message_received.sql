@@ -1,0 +1,2 @@
+ALTER TABLE `tenant_message_settings` ADD `received_in_list` boolean DEFAULT true NOT NULL;--> statement-breakpoint
+ALTER TABLE `tenant_message_settings` ADD `received_in_detail` boolean DEFAULT true NOT NULL;

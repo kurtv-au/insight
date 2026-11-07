@@ -104,6 +104,10 @@ export const tenantMessageSettings = mysqlTable('tenant_message_settings', {
   knownFieldKeys: json('known_field_keys').$type<string[]>(),
   // Bumped on every save, so a stale editor can't overwrite a newer configuration
   revision: int('revision').notNull().default(0),
+  // When the message was taken: a default list column, and the message drawer's
+  // title. Both off hides it everywhere, the CSV export included.
+  receivedInList: boolean('received_in_list').notNull().default(true),
+  receivedInDetail: boolean('received_in_detail').notNull().default(true),
   updatedByUserId: varchar('updated_by_user_id', { length: 36 }).references(() => users.id, { onDelete: 'set null' }),
   updatedAt: updatedAt()
 }, table => [

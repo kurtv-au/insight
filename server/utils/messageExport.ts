@@ -33,14 +33,21 @@ export function exportDate(date: Date, timeZone: string) {
 
 /**
  * The export's rows, header first: when the message was taken (in the
- * viewer's zone), its account number, then each field as the messages page
- * formats it in full. Empty values are left empty.
+ * viewer's zone, unless the account doesn't show it), its account number, then
+ * each field as the messages page formats it in full. Empty values are left
+ * empty.
  */
-export function messagesToCsvRows(messages: readonly MessageRow[], fields: readonly MessageColumnField[], timeZone: string): string[][] {
+export function messagesToCsvRows(
+  messages: readonly MessageRow[],
+  fields: readonly MessageColumnField[],
+  timeZone: string,
+  options: { received?: boolean } = {}
+): string[][] {
+  const received = options.received !== false
   const columns = exportFields(fields)
-  const header = [`Received (${timezoneLabel(timeZone)})`, 'Account #', ...columns.map(field => field.label)]
+  const header = [...(received ? [`Received (${timezoneLabel(timeZone)})`] : []), 'Account #', ...columns.map(field => field.label)]
   const rows = messages.map(message => [
-    message.createdAt ? exportDateTime(new Date(message.createdAt), timeZone) : '',
+    ...(received ? [message.createdAt ? exportDateTime(new Date(message.createdAt), timeZone) : ''] : []),
     message.accountNumber ?? '',
     ...columns.map((field) => {
       const value = message.fields[field.fieldKey]

@@ -47,6 +47,7 @@ beforeEach(() => {
     getValidatedQuery: vi.fn(async (_event: unknown, parse: (query: unknown) => unknown) => parse({ tz: 'America/New_York' })),
     rateLimit: vi.fn(async () => undefined),
     visibleMessageFields: vi.fn(async () => fields),
+    messageReceivedSetting: vi.fn(async () => ({ showInList: true, showInDetail: true })),
     resolveMessageRange: vi.fn(() => range),
     list
   }
@@ -64,6 +65,7 @@ beforeEach(() => {
   vi.stubGlobal('exportDate', exportDate)
   vi.stubGlobal('messagesToCsvRows', messagesToCsvRows)
   vi.stubGlobal('toCsv', toCsv)
+  vi.stubGlobal('receivedAvailable', (r: { showInList: boolean, showInDetail: boolean }) => r.showInList || r.showInDetail)
   for (const [name, fn] of Object.entries(mocks)) {
     if (name !== 'list') {
       vi.stubGlobal(name, fn)
@@ -115,6 +117,19 @@ describe('GET /api/tenants/:tenantId/messages/export', () => {
       'Content-Disposition': 'attachment; filename="goodwill-messages-2026-10-26-to-2026-11-01.csv"',
       'Cache-Control': 'no-store'
     })
+  })
+
+  it('leaves out Received when the account doesn\'t show it anywhere', async () => {
+    mocks.messageReceivedSetting!.mockResolvedValue({ showInList: false, showInDetail: false })
+    const lines = (await (await load())({})).trimEnd().split('\r\n')
+    expect(lines[0]).toBe('\uFEFFAccount #,Name')
+    expect(lines[1]).toBe('626,Caller 0')
+  })
+
+  it('keeps Received when the account shows it only in the message', async () => {
+    mocks.messageReceivedSetting!.mockResolvedValue({ showInList: false, showInDetail: true })
+    const lines = (await (await load())({})).trimEnd().split('\r\n')
+    expect(lines[0]).toBe('\uFEFFReceived (US/Eastern),Account #,Name')
   })
 
   it('writes just the header when no fields are configured, without loading messages', async () => {

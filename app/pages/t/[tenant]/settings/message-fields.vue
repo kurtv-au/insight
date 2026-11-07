@@ -25,7 +25,7 @@ const timeZone = computed(() => config.value?.tenant.timezone ?? DEFAULT_TIMEZON
 
 // ---------------------------------------------------------------- draft
 
-type Draft = { account: string | null, fields: MessageFieldConfig[] }
+type Draft = { account: string | null, fields: MessageFieldConfig[], received: MessageReceivedSetting }
 
 function toDraftField(field: SavedMessageField): MessageFieldConfig {
   const { fieldKey, label, type, format, order, showInList, showInDetail, isActive, showIfOrphaned } = field
@@ -36,25 +36,32 @@ function savedDraft(): Draft {
   const c = config.value
   return {
     account: c?.settings.scriptAccountNumber ?? c?.accountNumbers[0] ?? null,
-    fields: (c?.fields ?? []).map(toDraftField)
+    fields: (c?.fields ?? []).map(toDraftField),
+    received: { ...(c?.settings.received ?? DEFAULT_MESSAGE_RECEIVED) }
   }
 }
 
 const account = ref<string | null>(null)
 const fields = ref<MessageFieldConfig[]>([])
+const received = ref<MessageReceivedSetting>({ ...DEFAULT_MESSAGE_RECEIVED })
 
 function resetDraft() {
   const draft = savedDraft()
   account.value = draft.account
   fields.value = draft.fields
+  received.value = draft.received
 }
 resetDraft()
 
 // `order` follows the list; the array position is the truth while editing
 const orderedFields = computed(() => fields.value.map((field, order) => ({ ...field, order })))
-const snapshot = (draft: Draft) => JSON.stringify({ account: draft.account, fields: draft.fields.map((field, order) => ({ ...field, order })) })
+const snapshot = (draft: Draft) => JSON.stringify({
+  account: draft.account,
+  fields: draft.fields.map((field, order) => ({ ...field, order })),
+  received: { showInList: draft.received.showInList, showInDetail: draft.received.showInDetail }
+})
 const baseline = computed(() => snapshot(savedDraft()))
-const dirty = computed(() => snapshot({ account: account.value, fields: fields.value }) !== baseline.value)
+const dirty = computed(() => snapshot({ account: account.value, fields: fields.value, received: received.value }) !== baseline.value)
 
 // ---------------------------------------------------------------- script
 
@@ -181,7 +188,8 @@ useSortable(listEl, fields, {
 const body = computed(() => ({
   revision: config.value?.settings.revision ?? 0,
   scriptAccountNumber: account.value,
-  fields: orderedFields.value
+  fields: orderedFields.value,
+  received: received.value
 }))
 const validation = computed(() => messageFieldConfigInputSchema.safeParse(body.value))
 const rowErrors = computed(() => {
@@ -362,6 +370,10 @@ const savedSummary = computed(() => {
             @click="toggleAll"
           />
         </div>
+        <MessageFieldsReceivedRow
+          v-model:setting="received"
+          class="mb-1.5"
+        />
         <ul
           ref="selectedList"
           class="min-h-24 space-y-1.5 rounded-standard"
@@ -413,6 +425,7 @@ const savedSummary = computed(() => {
       <MessageFieldsPreview
         :fields="previewFields"
         :time-zone="timeZone"
+        :received="received.showInList"
       />
     </section>
 
