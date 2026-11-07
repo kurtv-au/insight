@@ -88,6 +88,11 @@ const orphanCount = computed(() => fields.value.filter(isOrphaned).length)
 const liveMessage = ref('')
 const listEl = useTemplateRef<HTMLElement>('selectedList')
 
+// Rows are one line each until opened, so the list stays easy to drag through.
+// Kept by field key, so an open row stays open when it moves.
+const expanded = ref(new Set<string>())
+const allExpanded = computed(() => fields.value.length > 0 && fields.value.every(f => expanded.value.has(canonicalFieldKey(f.fieldKey))))
+
 function addField(field: ScriptFieldDto, at = fields.value.length) {
   if (fields.value.some(f => canonicalFieldKey(f.fieldKey) === canonicalFieldKey(field.key))) {
     return
@@ -95,7 +100,22 @@ function addField(field: ScriptFieldDto, at = fields.value.length) {
   const next = [...fields.value]
   next.splice(at, 0, newFieldFromScript(field, at))
   fields.value = next
+  // Open a new field's settings: its label is usually the first thing to change
+  expanded.value = new Set(expanded.value).add(canonicalFieldKey(field.key))
   liveMessage.value = `Added ${field.label ?? field.key} at position ${at + 1} of ${next.length}`
+}
+
+function toggleField(field: MessageFieldConfig) {
+  const key = canonicalFieldKey(field.fieldKey)
+  const next = new Set(expanded.value)
+  if (!next.delete(key)) {
+    next.add(key)
+  }
+  expanded.value = next
+}
+
+function toggleAll() {
+  expanded.value = allExpanded.value ? new Set() : new Set(fields.value.map(f => canonicalFieldKey(f.fieldKey)))
 }
 
 function removeField(index: number) {
@@ -173,6 +193,13 @@ const rowErrors = computed(() => {
     }
   }
   return errors
+})
+// Open a row when it gets a problem, so its message and the setting are in view
+watch(rowErrors, (errors) => {
+  const keys = [...errors.keys()].map(index => fields.value[index]).filter(f => !!f).map(f => canonicalFieldKey(f.fieldKey))
+  if (keys.some(key => !expanded.value.has(key))) {
+    expanded.value = new Set([...expanded.value, ...keys])
+  }
 })
 const formErrors = computed(() => validation.value.success
   ? []
@@ -319,12 +346,23 @@ const savedSummary = computed(() => {
           :count="`${fields.length} ${fields.length === 1 ? 'field' : 'fields'}${orphanCount ? ` · ${orphanCount} not in script` : ''}`"
           class="mb-3"
         />
-        <p class="mb-3 text-body-sm text-muted">
-          In list order. Drag by the handle, or use the arrows.
-        </p>
+        <div class="mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <p class="text-body-sm text-muted">
+            In list order. Drag by the handle, or use the arrows. Open a field to change its label, type and format.
+          </p>
+          <UButton
+            v-if="fields.length"
+            :label="allExpanded ? 'Collapse all' : 'Expand all'"
+            :icon="allExpanded ? 'i-lucide-chevrons-down-up' : 'i-lucide-chevrons-up-down'"
+            color="neutral"
+            variant="link"
+            size="xs"
+            @click="toggleAll"
+          />
+        </div>
         <ul
           ref="selectedList"
-          class="min-h-24 space-y-3 rounded-standard"
+          class="min-h-24 space-y-1.5 rounded-standard"
           :class="!fields.length && 'border border-dashed border-default'"
           aria-label="Selected fields"
         >
@@ -338,10 +376,12 @@ const savedSummary = computed(() => {
             :script-field="scriptByKey.get(canonicalFieldKey(field.fieldKey)) ?? null"
             :orphaned="isOrphaned(field)"
             :suggested-type="drift.typeMismatches.get(canonicalFieldKey(field.fieldKey)) ?? null"
+            :expanded="expanded.has(canonicalFieldKey(field.fieldKey))"
             :error="rowErrors.get(index)"
             @update:field="fields[index] = $event"
             @move="moveField(index, $event)"
             @remove="removeField(index)"
+            @toggle="toggleField(field)"
           />
         </ul>
         <AsideNote

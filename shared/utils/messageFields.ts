@@ -103,7 +103,8 @@ export const fieldKeySchema = z.string()
 
 const fieldBaseShape = {
   fieldKey: fieldKeySchema,
-  label: z.string().trim().min(1, 'Every field needs a label').max(255),
+  // Script markers are stripped, so a label pasted from a script is stored clean
+  label: z.string().transform(label => cleanFieldLabel(label)).pipe(z.string().min(1, 'Every field needs a label').max(255)),
   order: z.number().int().min(0),
   showInList: z.boolean(),
   showInDetail: z.boolean(),
@@ -223,6 +224,37 @@ export function humanizeFieldKey(key: string) {
   const words = key.replace(/[_\-.]+/g, ' ').replace(/([a-z\d])([A-Z])/g, '$1 $2').trim().split(/\s+/)
   const text = words.map((word, i) => (i === 0 ? word : /^[A-Z\d]+$/.test(word) ? word : word.toLowerCase())).join(' ')
   return text.charAt(0).toUpperCase() + text.slice(1)
+}
+
+/** Symbols kept in labels because they can mean something to a reader ("Temperature (°F)") */
+const KEPT_SYMBOLS = '°©®™'
+const LABEL_SYMBOLS = new RegExp(`[^\\P{So}${KEPT_SYMBOLS}]|\\p{Co}`, 'gu')
+const LABEL_SUPERSCRIPTS = /[\u00B2\u00B3\u00B9\u2070-\u209F]/gu
+const LABEL_STANDALONE_MARKERS = /(^|\s)[Øø](?=\s|$)/gu
+const LABEL_CONTROLS = /[\p{Cc}\p{Cf}]/gu
+
+/**
+ * A label without the operator markers call-center scripts put in them (↟, ⇄,
+ * a standalone Ø, superscript digits…), which mean nothing to customers.
+ * Punctuation, accented letters and currency stay. May return '': callers fall
+ * back to the field key.
+ */
+export function cleanFieldLabel(label: string) {
+  return label
+    .replace(LABEL_CONTROLS, ' ')
+    .replace(LABEL_SYMBOLS, '')
+    .replace(LABEL_SUPERSCRIPTS, '')
+    .replace(LABEL_STANDALONE_MARKERS, '$1')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/** The script with its field labels cleaned; a label left empty becomes null, as if the script had none */
+export function cleanScriptLabels(script: ActiveScriptDto): ActiveScriptDto {
+  return {
+    ...script,
+    fields: script.fields.map(field => ({ ...field, label: field.label === null ? null : cleanFieldLabel(field.label) || null }))
+  }
 }
 
 /** The type a script field starts as when an admin adds it */
