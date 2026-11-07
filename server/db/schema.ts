@@ -85,6 +85,8 @@ export const userTenantPreferences = mysqlTable('user_tenant_preferences', {
   tenantId: varchar('tenant_id', { length: 36 }).notNull().references(() => tenants.id, { onDelete: 'cascade' }),
   // Null follows the tenant's default columns
   recordingColumns: json('recording_columns').$type<RecordingColumn[]>(),
+  // Message field keys shown as columns; null follows the fields' list setting
+  messageColumns: json('message_columns').$type<string[]>(),
   updatedAt: updatedAt()
 }, table => [
   primaryKey({ columns: [table.userId, table.tenantId] })

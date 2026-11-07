@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { DropdownMenuItem } from '@nuxt/ui'
 import type { CalendarDate } from '@internationalized/date'
 import { parseDate, today } from '@internationalized/date'
 
@@ -16,8 +17,16 @@ useSeoMeta({ title: 'Messages' })
 const tenantId = tenant.value!.id
 const api = `/api/tenants/${tenantId}/messages` as const
 
-const { data: config } = await useFetch(`${api}/config`)
+const { data: config, refresh: refreshConfig } = await useFetch(`${api}/config`)
 const fields = computed(() => config.value?.fields ?? [])
+
+// Columns: each person's own choice of fields, saved per account
+const columns = ref<string[]>(config.value?.columns ?? [])
+watch(() => config.value?.columns, (value) => {
+  if (value) {
+    columns.value = value
+  }
+})
 
 // Filters, page and the open message live in the URL
 function queryString(key: string) {
@@ -173,7 +182,43 @@ function setDates(from?: CalendarDate, to?: CalendarDate) {
 
 // Table: columns come from the tenant's configured fields
 const selectedId = computed(() => queryString('m'))
-const tableColumns = computed(() => buildMessageColumns(fields.value, { timeZone: timezone.value }))
+const tableColumns = computed(() => buildMessageColumns(fields.value, { timeZone: timezone.value, columns: columns.value }))
+
+async function saveColumns(next: string[] | null) {
+  if (next) {
+    columns.value = next
+  }
+  try {
+    await $fetch(`${api}/columns`, { method: 'PUT', body: { columns: next } })
+    await refreshConfig()
+  } catch (err) {
+    toast.add({ title: errorMessage(err), color: 'error' })
+    await refreshConfig()
+  }
+}
+
+// Every field the page shows can be a column; Received always is
+const columnMenu = computed<DropdownMenuItem[][]>(() => [
+  [{ type: 'label', label: 'Show columns' }],
+  [
+    { label: 'Received', type: 'checkbox' as const, checked: true, disabled: true },
+    ...[...fields.value].sort((a, b) => a.order - b.order).map(field => ({
+      label: field.label,
+      type: 'checkbox' as const,
+      checked: columns.value.includes(field.fieldKey),
+      onUpdateChecked: (checked: boolean) => saveColumns(fields.value
+        .filter(f => f.fieldKey === field.fieldKey ? checked : columns.value.includes(f.fieldKey))
+        .map(f => f.fieldKey)),
+      onSelect: (e: Event) => e.preventDefault()
+    }))
+  ],
+  [{
+    label: 'Reset to default',
+    icon: 'i-lucide-rotate-ccw',
+    disabled: !config.value?.mine,
+    onSelect: () => saveColumns(null)
+  }]
+])
 const tableMeta = {
   class: {
     tr: (row: { original: MessageRow }) => [
@@ -259,6 +304,17 @@ const rangeNote = computed(() => `Messages go back ${historyDays.value} ${histor
           v-if="config?.configured"
           #actions
         >
+          <UDropdownMenu
+            :items="columnMenu"
+            :content="{ align: 'end' }"
+          >
+            <UButton
+              label="Columns"
+              icon="i-lucide-columns-3"
+              color="neutral"
+              variant="outline"
+            />
+          </UDropdownMenu>
           <UButton
             label="Export CSV"
             icon="i-lucide-download"

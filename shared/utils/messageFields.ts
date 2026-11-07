@@ -398,6 +398,26 @@ export function listFields<T extends Pick<MessageFieldConfig, 'order' | 'showInL
   return byOrder(fields.filter(field => field.showInList))
 }
 
+/** A person's own message columns: field keys of the fields shown on the messages page */
+export const messageColumnsSchema = z.array(fieldKeySchema).max(MAX_MESSAGE_FIELDS)
+
+/**
+ * The fields a person's messages table shows as columns, in field order. Their
+ * own choice when they have one (null follows the fields' list setting),
+ * matched case-insensitively against the current fields, since the setup can
+ * change after they chose. A choice none of whose fields still exist falls back
+ * to the list setting rather than leave an empty table; an empty choice is
+ * honoured.
+ */
+export function resolveMessageColumns<T extends Pick<MessageFieldConfig, 'fieldKey' | 'order' | 'showInList'>>(fields: readonly T[], mine: readonly string[] | null) {
+  if (mine === null) {
+    return listFields(fields)
+  }
+  const chosen = new Set(mine.map(canonicalFieldKey))
+  const columns = byOrder(fields.filter(field => chosen.has(canonicalFieldKey(field.fieldKey))))
+  return columns.length || !mine.length ? columns : listFields(fields)
+}
+
 /** Fields of the message detail view, in order */
 export function detailFields<T extends Pick<MessageFieldConfig, 'order' | 'showInDetail'>>(fields: readonly T[]) {
   return byOrder(fields.filter(field => field.showInDetail))

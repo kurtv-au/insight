@@ -7,7 +7,12 @@ import type { TableColumn } from '@nuxt/ui'
  */
 export function buildMessageColumns(
   fields: readonly MessageColumnField[],
-  options: { timeZone: string, received?: boolean }
+  options: {
+    timeZone: string
+    received?: boolean
+    /** The person's own choice of field keys; without it, the fields' list setting */
+    columns?: readonly string[]
+  }
 ): TableColumn<MessageRow>[] {
   const columns: TableColumn<MessageRow>[] = []
 
@@ -19,7 +24,7 @@ export function buildMessageColumns(
     })
   }
 
-  for (const field of listFields(fields)) {
+  for (const field of resolveMessageColumns(fields, options.columns ?? null)) {
     const numeric = field.type === 'number' || field.type === 'currency'
     columns.push({
       id: `field:${field.fieldKey}`,
