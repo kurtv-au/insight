@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
-import { EXPORT_PAGE_SIZE, MAX_EXPORT_MESSAGES, exportDate, messagesToCsvRows } from '../../server/utils/messageExport'
+import { EXPORT_PAGE_SIZE, MAX_EXPORT_MESSAGES, exportDate, loadAllMessages, messagesToCsvRows } from '../../server/utils/messageExport'
+import { isDefaultMessageSort, resolveMessageSort, sortMessageRows } from '../../shared/utils/messageFields'
 import { toCsv } from '../../shared/utils/csv'
 import type { MessageColumnField } from '../../shared/utils/messageFields'
 
@@ -55,7 +56,7 @@ beforeEach(() => {
   vi.stubGlobal('getRouterParam', () => 'tenant-1')
   vi.stubGlobal('createError', ({ statusCode, message }: { statusCode: number, message: string }) => new HttpError(statusCode, message))
   vi.stubGlobal('setResponseHeaders', (_event: unknown, values: Record<string, string>) => Object.assign(headers, values))
-  vi.stubGlobal('messageRangeQuerySchema', z.object({ from: z.string().optional(), to: z.string().optional(), q: z.string().optional() }))
+  vi.stubGlobal('messageRangeQuerySchema', z.object({ from: z.string().optional(), to: z.string().optional(), q: z.string().optional(), sort: z.string().optional(), dir: z.enum(['asc', 'desc']).optional() }))
   vi.stubGlobal('useDb', () => ({ query: { tenantRecordingAccounts: { findMany: async () => [{ accountNumber: '626' }] } } }))
   vi.stubGlobal('tables', { tenantRecordingAccounts: { tenantId: 'tenant_id' } })
   vi.stubGlobal('messageSource', () => ({ isMock: false, list }))
@@ -64,6 +65,10 @@ beforeEach(() => {
   vi.stubGlobal('MAX_EXPORT_MESSAGES', MAX_EXPORT_MESSAGES)
   vi.stubGlobal('exportDate', exportDate)
   vi.stubGlobal('messagesToCsvRows', messagesToCsvRows)
+  vi.stubGlobal('loadAllMessages', loadAllMessages)
+  vi.stubGlobal('sortMessageRows', sortMessageRows)
+  vi.stubGlobal('resolveMessageSort', resolveMessageSort)
+  vi.stubGlobal('isDefaultMessageSort', isDefaultMessageSort)
   vi.stubGlobal('toCsv', toCsv)
   vi.stubGlobal('receivedAvailable', (r: { showInList: boolean, showInDetail: boolean }) => r.showInList || r.showInDetail)
   for (const [name, fn] of Object.entries(mocks)) {
@@ -117,6 +122,13 @@ describe('GET /api/tenants/:tenantId/messages/export', () => {
       'Content-Disposition': 'attachment; filename="goodwill-messages-2026-10-26-to-2026-11-01.csv"',
       'Cache-Control': 'no-store'
     })
+  })
+
+  it('writes the rows in the list\'s sort order', async () => {
+    total = 3
+    mocks.getValidatedQuery!.mockImplementation(async (_event: unknown, parse: (q: unknown) => unknown) => parse({ tz: 'America/New_York', sort: 'Name', dir: 'desc' }))
+    const lines = (await (await load())({})).trimEnd().split('\r\n')
+    expect(lines.slice(1).map(line => line.split(',').at(-1))).toEqual(['Caller 2', 'Caller 1', 'Caller 0'])
   })
 
   it('leaves out Received when the account doesn\'t show it anywhere', async () => {

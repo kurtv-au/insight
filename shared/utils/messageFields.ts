@@ -14,6 +14,7 @@
  */
 import { z } from 'zod'
 import { formatPhone } from './recordings.ts'
+import type { SortDirection } from './recordings.ts'
 import { accountNumberSchema } from './schemas.ts'
 import type { MessageFieldType } from './messageFieldTypes'
 
@@ -736,6 +737,117 @@ function formatByType(value: unknown, raw: string, type: MessageFieldType, f: ne
       return loose ? loose.label : raw
     }
   }
+}
+
+/* ----------------------------------------------------------------- sorting */
+
+/** A message list sort: by a field's key, or null for when it was received */
+export interface MessageSort {
+  fieldKey: string | null
+  direction: SortDirection
+}
+
+/**
+ * The sort a list asks for (`sort` is a field key, none means when it was
+ * received; `dir` asc or desc, none means that column's default). A field the
+ * page doesn't show, e.g. after the setup changed, means the default order.
+ */
+export function resolveMessageSort(fields: readonly Pick<MessageColumnField, 'fieldKey' | 'type'>[], sort?: string | null, dir?: string | null): MessageSort {
+  const field = sort ? fields.find(f => canonicalFieldKey(f.fieldKey) === canonicalFieldKey(sort)) : undefined
+  if (sort && !field) {
+    return { fieldKey: null, direction: 'desc' }
+  }
+  return {
+    fieldKey: field?.fieldKey ?? null,
+    direction: dir === 'asc' || dir === 'desc' ? dir : messageSortDefault(field?.type ?? null)
+  }
+}
+
+/** Newest first: the order au-api already returns, so no sorting is needed */
+export function isDefaultMessageSort(sort: MessageSort) {
+  return sort.fieldKey === null && sort.direction === 'desc'
+}
+
+/** The first click on a column: newest, largest or latest first for dates and amounts, else A–Z */
+export function messageSortDefault(type: MessageFieldType | null): SortDirection {
+  return type === null || type === 'number' || type === 'currency' || type === 'date' || type === 'datetime' ? 'desc' : 'asc'
+}
+
+type SortKey = { number: number } | { text: string }
+
+const SORT_COLLATOR = new Intl.Collator(LOCALE, { numeric: true, sensitivity: 'base' })
+
+/**
+ * What a value sorts by, read the same way the formatter reads it: numbers,
+ * dates and times by what they mean, yes/no and choices by the label shown,
+ * anything else as text. Null for an empty value.
+ */
+function sortKey(value: unknown, field: Pick<MessageColumnField, 'type' | 'format'>): SortKey | null {
+  if (isEmpty(value)) {
+    return null
+  }
+  const text = typeof value === 'string' ? value.trim() : String(value)
+  switch (field.type) {
+    case 'number':
+    case 'currency': {
+      const number = toNumber(value)
+      return number === null ? { text } : { number }
+    }
+    case 'date':
+    case 'datetime': {
+      const clock = typeof value === 'string' ? parseWallClock(value) : null
+      const date = clock ? wallClockDate(clock) : toInstant(value)
+      return date ? { number: date.getTime() } : { text }
+    }
+    case 'time': {
+      const time = typeof value === 'string' ? parseTimeOfDay(value) : null
+      const clock = !time && typeof value === 'string' ? parseWallClock(value) : null
+      const parts = time ?? (clock?.hour !== undefined ? { hour: clock.hour, minute: clock.minute ?? 0, second: clock.second ?? 0 } : null)
+      return parts ? { number: parts.hour * 3600 + parts.minute * 60 + parts.second } : { text }
+    }
+    case 'boolean':
+    case 'select':
+      return { text: formatFieldValue(value, field.type, field.format) }
+    default:
+      return { text }
+  }
+}
+
+function compareKeys(a: SortKey, b: SortKey) {
+  if ('number' in a && 'number' in b) {
+    return a.number - b.number
+  }
+  // Values that read as numbers or dates come before ones that don't
+  if ('number' in a) {
+    return -1
+  }
+  if ('number' in b) {
+    return 1
+  }
+  return SORT_COLLATOR.compare(a.text, b.text)
+}
+
+const receivedTime = (row: MessageRow) => (row.createdAt ? Date.parse(row.createdAt) : Number.NEGATIVE_INFINITY)
+
+/**
+ * Messages in the requested order. Empty values go last either way; ties stay
+ * newest first. Sorting by a field the list doesn't have is the default order.
+ */
+export function sortMessageRows(rows: readonly MessageRow[], fields: readonly MessageColumnField[], sort: MessageSort): MessageRow[] {
+  const field = sort.fieldKey === null ? null : fields.find(f => f.fieldKey === sort.fieldKey) ?? null
+  const sign = sort.direction === 'asc' ? 1 : -1
+  const newestFirst = (a: MessageRow, b: MessageRow) => receivedTime(b) - receivedTime(a) || SORT_COLLATOR.compare(b.id, a.id)
+  if (!field) {
+    return [...rows].sort((a, b) => sort.fieldKey === null && sort.direction === 'asc' ? -newestFirst(a, b) : newestFirst(a, b))
+  }
+  const keyed = rows.map(row => ({ row, key: sortKey(row.fields[field.fieldKey], field) }))
+  keyed.sort((a, b) => {
+    if (!a.key || !b.key) {
+      return a.key ? -1 : b.key ? 1 : newestFirst(a.row, b.row)
+    }
+    return sign * compareKeys(a.key, b.key) || newestFirst(a.row, b.row)
+  })
+  return keyed.map(item => item.row)
 }
 
 /* ------------------------------------------------------------- sample data */

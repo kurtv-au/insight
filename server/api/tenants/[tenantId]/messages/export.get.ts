@@ -7,7 +7,7 @@ const querySchema = messageRangeQuerySchema.extend({
 
 /**
  * Every message matching the messages page's filters (date range and search,
- * across all pages) as a CSV download. Same access, range rules and visible
+ * across all pages), in its sort order, as a CSV download. Same access, range rules and visible
  * fields as the list: hidden fields never leave, as on the page.
  */
 export default defineEventHandler(async (event) => {
@@ -25,24 +25,13 @@ export default defineEventHandler(async (event) => {
     const accounts = await useDb().query.tenantRecordingAccounts.findMany({
       where: eq(tables.tenantRecordingAccounts.tenantId, tenantId)
     })
-    const source = messageSource()
     const base = { tenantId, accountNumbers: accounts.map(account => account.accountNumber), fields, ...range, q: query.q || undefined }
-
-    let total = Infinity
-    for (let offset = 0; offset < total; offset += EXPORT_PAGE_SIZE) {
-      const page = await source.list({ ...base, offset, limit: EXPORT_PAGE_SIZE })
-      total = page.total
-      if (total > MAX_EXPORT_MESSAGES) {
-        throw createError({
-          statusCode: 400,
-          message: `That’s ${total.toLocaleString('en-US')} messages, more than the ${MAX_EXPORT_MESSAGES.toLocaleString('en-US')} an export can hold. Choose a shorter range or search.`
-        })
-      }
-      rows.push(...page.items.map(message => serializeMessage(message, fields)))
-      if (!page.items.length) {
-        break
-      }
-    }
+    const all = await loadAllMessages(messageSource(), base, (total, max) =>
+      `That’s ${total.toLocaleString('en-US')} messages, more than the ${max.toLocaleString('en-US')} an export can hold. Choose a shorter range or search.`)
+    // In the list's order: au-api's newest first, unless the list is sorted otherwise
+    const sort = resolveMessageSort(fields, query.sort, query.dir)
+    const serialized = all.map(message => serializeMessage(message, fields))
+    rows.push(...(isDefaultMessageSort(sort) ? serialized : sortMessageRows(serialized, fields, sort)))
   }
 
   const days = range

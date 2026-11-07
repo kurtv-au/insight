@@ -69,11 +69,14 @@ const MINUTE_MS = 60 * 1000
 /** Seven calendar days across a DST change are an hour longer */
 const MAX_SPAN_MS = MAX_MESSAGE_RANGE_DAYS * DAY_MS + 60 * MINUTE_MS
 
-/** The filters the messages list and its export share */
+/** The filters and sort the messages list and its export share */
 export const messageRangeQuerySchema = z.object({
   from: z.iso.datetime({ offset: true }).optional(),
   to: z.iso.datetime({ offset: true }).optional(),
-  q: z.string().trim().max(100).optional()
+  q: z.string().trim().max(100).optional(),
+  // A field key; none sorts by when the message was received
+  sort: z.string().trim().max(128).optional(),
+  dir: z.enum(SORT_DIRECTIONS).optional()
 })
 
 /**
