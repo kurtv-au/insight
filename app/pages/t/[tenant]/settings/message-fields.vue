@@ -2,13 +2,15 @@
 import type { SortableEvent } from 'sortablejs'
 import { moveArrayElement, useSortable } from '@vueuse/integrations/useSortable'
 
+// Platform admins only. Under the account (/t/[tenant]/settings) so the rail,
+// switcher and status banners show which account is being configured.
 definePageMeta({ middleware: 'admin' })
 
-const route = useRoute()
 const toast = useToast()
 const confirm = useConfirm()
+const { tenant } = useTenant()
 
-const tenantId = route.params.id as string
+const tenantId = tenant.value!.id
 const api = `/api/admin/tenants/${tenantId}/message-fields` as const
 
 const { data: config, refresh: refreshConfig, error: configError } = await useFetch(api)

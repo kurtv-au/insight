@@ -408,7 +408,7 @@ async function removeAccountNumber(accountNumber: string) {
               icon="i-lucide-list-checks"
               color="neutral"
               variant="outline"
-              :to="`/admin/tenants/${tenantId}/message-fields`"
+              :to="`/t/${tenant?.slug}/settings/message-fields`"
             />
           </div>
         </UCard>

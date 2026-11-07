@@ -229,7 +229,7 @@ const rangeNote = computed(() => `Messages go back ${historyDays.value} ${histor
           icon="i-lucide-list-checks"
           title="Messages aren’t set up for this account yet"
           description="Choose which fields of the account’s script the messages list shows."
-          :actions="[{ label: 'Set up message fields', to: `/admin/tenants/${tenantId}/message-fields`, color: 'neutral', variant: 'outline', icon: 'i-lucide-arrow-right' }]"
+          :actions="[{ label: 'Set up message fields', to: `/t/${tenant?.slug}/settings/message-fields`, color: 'neutral', variant: 'outline', icon: 'i-lucide-arrow-right' }]"
         />
         <UAlert
           v-else
