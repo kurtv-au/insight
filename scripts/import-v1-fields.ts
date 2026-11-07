@@ -50,7 +50,7 @@ try {
 await import('./import-v1/globals.ts')
 const { buildImportPlan, ImportError } = await import('./import-v1/map.ts')
 const { buildFieldConfig, groupV1MessageFields } = await import('./import-v1/fields.ts')
-const { messageFieldConfigInputSchema, canonicalFieldKey } = await import('../shared/utils/messageFields.ts')
+const { messageFieldConfigInputSchema, canonicalFieldKey, cleanScriptLabels } = await import('../shared/utils/messageFields.ts')
 const { toActiveScriptDto } = await import('../server/scripts/au-api.ts')
 type ActiveScript = import('../shared/utils/messageFields.ts').ActiveScriptDto
 type ApiActiveScript = import('../server/scripts/au-api.ts').ApiActiveScript
@@ -78,7 +78,7 @@ async function activeScript(accountNumber: string): Promise<ActiveScript | 'no_s
     throw new Error(`au-api answered ${response.status} for account number ${accountNumber}; nothing was written`)
   }
   const body = await response.json() as { data: { script: ApiActiveScript | null } }
-  return body.data.script ? toActiveScriptDto(body.data.script) : 'no_script'
+  return body.data.script ? cleanScriptLabels(toActiveScriptDto(body.data.script)) : 'no_script'
 }
 
 // Which tenant each v1 account became: its account numbers, as the account import mapped them

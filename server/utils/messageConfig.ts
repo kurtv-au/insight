@@ -2,10 +2,12 @@ import { asc, eq } from 'drizzle-orm'
 
 type MessageFieldRow = typeof tables.tenantMessageFields.$inferSelect
 
+// Labels are cleaned on the way out too, so one saved before markers were
+// stripped reads clean everywhere and is stored clean at the next save
 function toSavedField(row: MessageFieldRow): SavedMessageField {
   return {
     fieldKey: row.fieldKey,
-    label: row.label,
+    label: cleanFieldLabel(row.label) || humanizeFieldKey(row.fieldKey),
     type: row.type,
     format: row.format,
     order: row.position,

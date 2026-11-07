@@ -26,6 +26,8 @@ function scriptSource(): ScriptSource {
   throw createError({ statusCode: 503, message: SCRIPTS_UNAVAILABLE })
 }
 
-export function getActiveScript(accountNumber: string): Promise<ActiveScriptLookup> {
-  return scriptSource().activeScript(accountNumber)
+/** The account's active script, with the operator markers taken out of its labels */
+export async function getActiveScript(accountNumber: string): Promise<ActiveScriptLookup> {
+  const lookup = await scriptSource().activeScript(accountNumber)
+  return lookup.status === 'ok' ? { status: 'ok', script: cleanScriptLabels(lookup.script) } : lookup
 }
