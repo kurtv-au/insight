@@ -20,11 +20,13 @@ const api = `/api/tenants/${tenantId}/messages` as const
 const { data: config, refresh: refreshConfig } = await useFetch(`${api}/config`)
 const fields = computed(() => config.value?.fields ?? [])
 
-// Columns: each person's own choice of fields, saved per account
+// Columns: each person's own choice of fields, and whether Received shows, saved per account
 const columns = ref<string[]>(config.value?.columns ?? [])
-watch(() => config.value?.columns, (value) => {
+const received = ref(config.value?.received ?? true)
+watch(() => [config.value?.columns, config.value?.received] as const, ([value, showReceived]) => {
   if (value) {
     columns.value = value
+    received.value = showReceived ?? true
   }
 })
 
@@ -182,14 +184,15 @@ function setDates(from?: CalendarDate, to?: CalendarDate) {
 
 // Table: columns come from the tenant's configured fields
 const selectedId = computed(() => queryString('m'))
-const tableColumns = computed(() => buildMessageColumns(fields.value, { timeZone: timezone.value, columns: columns.value }))
+const tableColumns = computed(() => buildMessageColumns(fields.value, { timeZone: timezone.value, columns: columns.value, received: received.value }))
 
-async function saveColumns(next: string[] | null) {
+async function saveColumns(next: { columns: string[], received: boolean } | null) {
   if (next) {
-    columns.value = next
+    columns.value = next.columns
+    received.value = next.received
   }
   try {
-    await $fetch(`${api}/columns`, { method: 'PUT', body: { columns: next } })
+    await $fetch(`${api}/columns`, { method: 'PUT', body: next ?? { columns: null } })
     await refreshConfig()
   } catch (err) {
     toast.add({ title: errorMessage(err), color: 'error' })
@@ -197,20 +200,38 @@ async function saveColumns(next: string[] | null) {
   }
 }
 
-// Every field the page shows can be a column; Received always is
+// Received (unless the account hides it) and every field the page shows can be
+// columns. The last column shown can't be turned off, so the table never ends up empty.
+const shownCount = computed(() => columns.value.length + (received.value ? 1 : 0))
 const columnMenu = computed<DropdownMenuItem[][]>(() => [
   [{ type: 'label', label: 'Show columns' }],
   [
-    { label: 'Received', type: 'checkbox' as const, checked: true, disabled: true },
-    ...[...fields.value].sort((a, b) => a.order - b.order).map(field => ({
-      label: field.label,
-      type: 'checkbox' as const,
-      checked: columns.value.includes(field.fieldKey),
-      onUpdateChecked: (checked: boolean) => saveColumns(fields.value
-        .filter(f => f.fieldKey === field.fieldKey ? checked : columns.value.includes(f.fieldKey))
-        .map(f => f.fieldKey)),
-      onSelect: (e: Event) => e.preventDefault()
-    }))
+    ...(config.value?.receivedSetting.available
+      ? [{
+          label: 'Received',
+          type: 'checkbox' as const,
+          checked: received.value,
+          disabled: received.value && shownCount.value === 1,
+          onUpdateChecked: (checked: boolean) => saveColumns({ columns: columns.value, received: checked }),
+          onSelect: (e: Event) => e.preventDefault()
+        }]
+      : []),
+    ...[...fields.value].sort((a, b) => a.order - b.order).map((field) => {
+      const checked = columns.value.includes(field.fieldKey)
+      return {
+        label: field.label,
+        type: 'checkbox' as const,
+        checked,
+        disabled: checked && shownCount.value === 1,
+        onUpdateChecked: (on: boolean) => saveColumns({
+          columns: fields.value
+            .filter(f => f.fieldKey === field.fieldKey ? on : columns.value.includes(f.fieldKey))
+            .map(f => f.fieldKey),
+          received: received.value
+        }),
+        onSelect: (e: Event) => e.preventDefault()
+      }
+    })
   ],
   [{
     label: 'Reset to default',
@@ -443,6 +464,7 @@ const rangeNote = computed(() => `Messages go back ${historyDays.value} ${histor
       v-model:open="drawerOpen"
       :message="selected"
       :fields="fields"
+      :show-received="config?.receivedSetting.showInDetail ?? true"
       :has-previous="selectedIndex > 0"
       :has-next="selectedIndex !== -1 && selectedIndex < results.items.length - 1"
       @previous="step(-1)"

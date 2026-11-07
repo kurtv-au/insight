@@ -5,6 +5,8 @@ const props = defineProps<{
   fields: MessageColumnField[]
   hasPrevious: boolean
   hasNext: boolean
+  /** The received time as the title; the account can turn it off */
+  showReceived?: boolean
 }>()
 
 // Steps through the list in its current order
@@ -27,7 +29,7 @@ const shown = computed(() => detailFields(props.fields))
     :modal="false"
     :overlay="false"
     :content="{ onInteractOutside: (e: Event) => e.preventDefault() }"
-    :title="message ? formatDateTime(message.createdAt) : 'Message'"
+    :title="message && showReceived !== false ? formatDateTime(message.createdAt) : 'Message'"
     description="Message"
     :ui="{ content: 'max-w-full sm:max-w-md' }"
   >

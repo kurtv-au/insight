@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
-import { messageColumnsSchema, resolveMessageColumns } from '../../shared/utils/messageFields'
+import { MESSAGE_RECEIVED_HIDDEN, MESSAGE_RECEIVED_SHOWN, messageColumnsSchema, resolveMessageColumns, resolveReceived, splitMessageColumns } from '../../shared/utils/messageFields'
 import type { MessageColumnField } from '../../shared/utils/messageFields'
 
 /**
@@ -43,6 +43,44 @@ describe('resolveMessageColumns', () => {
   })
 })
 
+describe('splitMessageColumns', () => {
+  it('has no Received choice without a marker, so the account\'s setting applies', () => {
+    expect(splitMessageColumns(null)).toEqual({ fields: null, received: null })
+    expect(splitMessageColumns(['CallTime'])).toEqual({ fields: ['CallTime'], received: null })
+  })
+
+  it('reads the shown and hidden markers out of the field keys', () => {
+    expect(splitMessageColumns(['CallTime', MESSAGE_RECEIVED_HIDDEN])).toEqual({ fields: ['CallTime'], received: false })
+    expect(splitMessageColumns([MESSAGE_RECEIVED_SHOWN, 'Reason'])).toEqual({ fields: ['Reason'], received: true })
+  })
+
+  it('uses markers no loadable field can be named', () => {
+    expect(MESSAGE_RECEIVED_HIDDEN.startsWith('__')).toBe(true)
+    expect(MESSAGE_RECEIVED_SHOWN.startsWith('__')).toBe(true)
+  })
+})
+
+describe('resolveReceived', () => {
+  const both = { showInList: true, showInDetail: true }
+  const detailOnly = { showInList: false, showInDetail: true }
+  const hidden = { showInList: false, showInDetail: false }
+
+  it('follows the account\'s list setting without a choice', () => {
+    expect(resolveReceived(both, null)).toBe(true)
+    expect(resolveReceived(detailOnly, null)).toBe(false)
+  })
+
+  it('lets the person\'s choice win while the account shows Received somewhere', () => {
+    expect(resolveReceived(both, false)).toBe(false)
+    expect(resolveReceived(detailOnly, true)).toBe(true)
+  })
+
+  it('never shows it when the account hides it everywhere', () => {
+    expect(resolveReceived(hidden, true)).toBe(false)
+    expect(resolveReceived(hidden, null)).toBe(false)
+  })
+})
+
 describe('messageColumnsSchema', () => {
   it('takes field keys', () => {
     expect(messageColumnsSchema.parse([' CallTime ', 'Reason'])).toEqual(['CallTime', 'Reason'])
@@ -81,6 +119,8 @@ describe('PUT /api/tenants/:tenantId/messages/columns', () => {
     vi.stubGlobal('getRouterParam', () => 'tenant-1')
     vi.stubGlobal('createError', ({ statusCode, message }: { statusCode: number, message: string }) => new HttpError(statusCode, message))
     vi.stubGlobal('messageColumnsSchema', messageColumnsSchema)
+    vi.stubGlobal('MESSAGE_RECEIVED_HIDDEN', MESSAGE_RECEIVED_HIDDEN)
+    vi.stubGlobal('MESSAGE_RECEIVED_SHOWN', MESSAGE_RECEIVED_SHOWN)
     vi.stubGlobal('tables', { userTenantPreferences: {} })
     vi.stubGlobal('useDb', () => ({
       insert: () => ({
@@ -114,8 +154,8 @@ describe('PUT /api/tenants/:tenantId/messages/columns', () => {
 
   it('keeps only fields the page shows, in their own spelling and order', async () => {
     await expect((await load())({})).resolves.toEqual({ ok: true })
-    expect(saved.values).toEqual({ userId: 'user-1', tenantId: 'tenant-1', messageColumns: ['CallTime', 'Message'] })
-    expect(saved.set?.messageColumns).toEqual(['CallTime', 'Message'])
+    expect(saved.values).toEqual({ userId: 'user-1', tenantId: 'tenant-1', messageColumns: ['CallTime', 'Message', MESSAGE_RECEIVED_SHOWN] })
+    expect(saved.set?.messageColumns).toEqual(['CallTime', 'Message', MESSAGE_RECEIVED_SHOWN])
   })
 
   it('stores null to go back to the default, without loading fields', async () => {
@@ -123,6 +163,24 @@ describe('PUT /api/tenants/:tenantId/messages/columns', () => {
     await (await load())({})
     expect(saved.values?.messageColumns).toBeNull()
     expect(mocks.visibleMessageFields).not.toHaveBeenCalled()
+  })
+
+  it('stores a hidden Received with the fields', async () => {
+    body = { columns: ['Reason'], received: false }
+    await (await load())({})
+    expect(saved.values?.messageColumns).toEqual(['Reason', MESSAGE_RECEIVED_HIDDEN])
+  })
+
+  it('keeps Received when hiding it would leave no columns', async () => {
+    body = { columns: ['Covid19Travel'], received: false }
+    await (await load())({})
+    expect(saved.values?.messageColumns).toEqual([MESSAGE_RECEIVED_SHOWN])
+  })
+
+  it('ignores received on a reset', async () => {
+    body = { columns: null, received: false }
+    await (await load())({})
+    expect(saved.values?.messageColumns).toBeNull()
   })
 
   it('rejects a malformed body', async () => {

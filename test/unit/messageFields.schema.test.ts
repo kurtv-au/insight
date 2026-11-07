@@ -156,3 +156,26 @@ describe('isRetrievableFieldKey', () => {
     }
   })
 })
+
+describe('received setting in a save', () => {
+  const listField = { fieldKey: 'Name', label: 'Name', type: 'text', format: {}, order: 0, showInList: true, showInDetail: true, isActive: true, showIfOrphaned: false }
+  const detailField = { ...listField, showInList: false }
+  const save = (fields: unknown[], received?: unknown) => messageFieldConfigInputSchema.safeParse({ revision: 0, scriptAccountNumber: '626', fields, ...(received ? { received } : {}) })
+
+  it('defaults to shown in the list and the message', () => {
+    const result = save([listField])
+    expect(result.success && result.data.received).toEqual({ showInList: true, showInDetail: true })
+  })
+
+  it('can be hidden everywhere while a field is a list column', () => {
+    expect(save([listField], { showInList: false, showInDetail: false }).success).toBe(true)
+  })
+
+  it('needs Received or a field as a list column', () => {
+    const result = save([detailField], { showInList: false, showInDetail: true })
+    expect(result.success).toBe(false)
+    expect(result.error?.issues.map(issue => issue.message)).toContain('Show Received or at least one field as a list column')
+    expect(save([detailField], { showInList: true, showInDetail: false }).success).toBe(true)
+    expect(save([], { showInList: false, showInDetail: false }).success).toBe(true)
+  })
+})

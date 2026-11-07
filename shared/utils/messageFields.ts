@@ -133,6 +133,23 @@ export const messageFieldSchema = z.discriminatedUnion('type', [
 ])
 
 /**
+ * When the message was taken, set up per account like a field: a default list
+ * column (people can still add or hide it in Columns) and the message drawer's
+ * title. With both off it isn't shown anywhere, the CSV export included.
+ */
+export interface MessageReceivedSetting {
+  showInList: boolean
+  showInDetail: boolean
+}
+
+/** Shown somewhere: as a list column or in the message drawer */
+export function receivedAvailable(setting: MessageReceivedSetting) {
+  return setting.showInList || setting.showInDetail
+}
+
+export const DEFAULT_MESSAGE_RECEIVED: MessageReceivedSetting = { showInList: true, showInDetail: true }
+
+/**
  * The body of a save. The whole configuration is replaced at once, so `order`
  * must be exactly 0..n-1 and keys unique (case-insensitively). `revision` is the
  * revision the editor loaded; a stale one is rejected so two admins can't
@@ -141,7 +158,8 @@ export const messageFieldSchema = z.discriminatedUnion('type', [
 export const messageFieldConfigInputSchema = z.object({
   revision: z.number().int().min(0),
   scriptAccountNumber: accountNumberSchema.nullable(),
-  fields: z.array(messageFieldSchema).max(MAX_MESSAGE_FIELDS, `At most ${MAX_MESSAGE_FIELDS} fields`)
+  fields: z.array(messageFieldSchema).max(MAX_MESSAGE_FIELDS, `At most ${MAX_MESSAGE_FIELDS} fields`),
+  received: z.object({ showInList: z.boolean(), showInDetail: z.boolean() }).default(DEFAULT_MESSAGE_RECEIVED)
 }).superRefine((data, ctx) => {
   const seen = new Map<string, number>()
   data.fields.forEach((field, index) => {
@@ -157,6 +175,10 @@ export const messageFieldConfigInputSchema = z.object({
   }
   if (data.fields.filter(field => field.isActive).length > MAX_RETRIEVED_MESSAGE_FIELDS) {
     ctx.addIssue({ code: 'custom', path: ['fields'], message: `Messages can show at most ${MAX_RETRIEVED_MESSAGE_FIELDS} fields; turn some off` })
+  }
+  // The messages table needs at least one column by default
+  if (data.fields.length && !data.received.showInList && !data.fields.some(field => field.isActive && field.showInList)) {
+    ctx.addIssue({ code: 'custom', path: ['received'], message: 'Show Received or at least one field as a list column' })
   }
 })
 
@@ -400,6 +422,32 @@ export function listFields<T extends Pick<MessageFieldConfig, 'order' | 'showInL
 
 /** A person's own message columns: field keys of the fields shown on the messages page */
 export const messageColumnsSchema = z.array(fieldKeySchema).max(MAX_MESSAGE_FIELDS)
+
+/**
+ * Stored among a person's message columns when they hide the Received column
+ * (shown unless they do). No script field can collide with it: au-api can't
+ * load field names starting with "__". The API speaks a plain boolean.
+ */
+export const MESSAGE_RECEIVED_HIDDEN = '__received_hidden'
+/** Stored when a person turns Received on, whatever the account's default */
+export const MESSAGE_RECEIVED_SHOWN = '__received_shown'
+
+/**
+ * A stored column choice split into its field keys (null: the fields' list
+ * setting) and the person's own Received choice (null: the account's).
+ */
+export function splitMessageColumns(stored: readonly string[] | null): { fields: string[] | null, received: boolean | null } {
+  if (stored === null) {
+    return { fields: null, received: null }
+  }
+  const received = stored.includes(MESSAGE_RECEIVED_HIDDEN) ? false : stored.includes(MESSAGE_RECEIVED_SHOWN) ? true : null
+  return { fields: stored.filter(key => key !== MESSAGE_RECEIVED_HIDDEN && key !== MESSAGE_RECEIVED_SHOWN), received }
+}
+
+/** Whether a person's table shows Received: never if the account hides it, else their choice or the account's list setting */
+export function resolveReceived(setting: MessageReceivedSetting, mine: boolean | null) {
+  return receivedAvailable(setting) && (mine ?? setting.showInList)
+}
 
 /**
  * The fields a person's messages table shows as columns, in field order. Their

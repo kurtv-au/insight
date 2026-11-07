@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
   await rateLimit(`messages-export:${user.id}`, 30, 60 * 60)
 
   const timeZone = query.tz ?? tenant.timezone
-  const fields = await visibleMessageFields(tenantId)
+  const [fields, receivedSetting] = await Promise.all([visibleMessageFields(tenantId), messageReceivedSetting(tenantId)])
   const range = fields.length ? resolveMessageRange(query, tenant.recordingHistoryDays) : null
 
   const rows: MessageRow[] = []
@@ -54,5 +54,6 @@ export default defineEventHandler(async (event) => {
     // Customer data: never kept by a browser or proxy cache
     'Cache-Control': 'no-store'
   })
-  return toCsv(messagesToCsvRows(rows, fields, timeZone))
+  // An account that doesn't show when messages were received doesn't export it either
+  return toCsv(messagesToCsvRows(rows, fields, timeZone, { received: receivedAvailable(receivedSetting) }))
 })

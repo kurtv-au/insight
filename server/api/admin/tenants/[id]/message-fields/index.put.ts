@@ -29,6 +29,7 @@ export default defineEventHandler(async (event) => {
     revision: body.revision,
     scriptAccountNumber: body.scriptAccountNumber,
     fields: body.fields,
+    received: body.received,
     script
   })
   return adminMessageConfig(tenantId)
