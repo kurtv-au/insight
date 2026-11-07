@@ -6,6 +6,10 @@ useSeoMeta({ title: 'Support' })
 
 const route = useRoute()
 const { user } = useUserSession()
+
+// The running release (e.g. "v2.2.0"), so people can tell support which version they're on
+const appVersion = useRuntimeConfig().public.appVersion
+const versionLabel = appVersion === 'dev' ? 'development build' : appVersion
 const { data: myTenants } = await useMyTenants()
 
 const NO_ACCOUNT = 'none'
@@ -236,6 +240,10 @@ function telHref(phone: string) {
         <AsideNote class="mt-5">
           For urgent changes to how your calls are handled, call Customer Service.
         </AsideNote>
+
+        <p class="mono-meta mt-8">
+          Insight {{ versionLabel }}
+        </p>
       </aside>
     </div>
   </div>

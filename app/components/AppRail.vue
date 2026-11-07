@@ -2,6 +2,7 @@
 import type { DropdownMenuItem } from '@nuxt/ui'
 import type { AppNavItem } from '~/composables/useAppNav'
 
+const route = useRoute()
 const { user } = useUserSession()
 const { tenant } = useTenant()
 const { data: myTenants } = await useMyTenants()
@@ -22,11 +23,14 @@ const switcherItems = computed<DropdownMenuItem[][]>(() => [
   user.value?.isPlatformAdmin ? [{ label: 'All tenants', icon: 'i-lucide-building-2', to: '/admin/tenants' }] : []
 ].filter(group => group.length > 0))
 
+// From inside an account, the support form starts with that account selected
+const supportTo = computed(() => tenant.value ? `/support?account=${tenant.value.slug}` : '/support')
+
 const accountMenu = computed<DropdownMenuItem[][]>(() => [
   [{ type: 'label', label: user.value?.name || user.value?.email, description: user.value?.name ? user.value.email : undefined }],
   [
     { label: 'Account', icon: 'i-lucide-circle-user-round', to: '/account' },
-    { label: 'Help & support', icon: 'i-lucide-life-buoy', to: tenant.value ? `/support?account=${tenant.value.slug}` : '/support' },
+    { label: 'Help & support', icon: 'i-lucide-life-buoy', to: supportTo.value },
     ...(user.value?.isPlatformAdmin ? [{ label: 'Admin', icon: 'i-lucide-shield', to: '/admin/tenants' }] : []),
     {
       label: colorMode.value === 'dark' ? 'Light mode' : 'Dark mode',
@@ -108,6 +112,23 @@ function itemClass(item: AppNavItem) {
     </div>
 
     <div class="mt-auto flex flex-col items-center gap-2.5">
+      <UTooltip
+        text="Help & support"
+        :content="{ side: 'right', sideOffset: 6 }"
+        :delay-duration="0"
+      >
+        <NuxtLink
+          :to="supportTo"
+          :class="[tileClass, route.path === '/support' && activeClass]"
+          aria-label="Help & support"
+        >
+          <UIcon
+            name="i-lucide-life-buoy"
+            class="size-[18px]"
+          />
+        </NuxtLink>
+      </UTooltip>
+
       <UDropdownMenu
         :items="accountMenu"
         :content="{ side: 'right', align: 'end', sideOffset: 8 }"
