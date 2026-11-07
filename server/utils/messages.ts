@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { auApiMessages, MESSAGES_UNAVAILABLE } from '../messages/au-api'
 import { mockMessages } from '../messages/mock'
 
@@ -61,6 +62,36 @@ export function messageHistoryStart(historyDays: number, now = new Date()) {
   const start = recordingHistoryStart(historyDays, now)
   start.setUTCSeconds(0, 0)
   return start
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
+const MINUTE_MS = 60 * 1000
+/** Seven calendar days across a DST change are an hour longer */
+const MAX_SPAN_MS = MAX_MESSAGE_RANGE_DAYS * DAY_MS + 60 * MINUTE_MS
+
+/** The filters the messages list and its export share */
+export const messageRangeQuerySchema = z.object({
+  from: z.iso.datetime({ offset: true }).optional(),
+  to: z.iso.datetime({ offset: true }).optional(),
+  q: z.string().trim().max(100).optional()
+})
+
+/**
+ * The instants to load messages between, from the page's filters. No `to`
+ * means up to now (rounded up to the minute, so repeated requests share
+ * au-api's cache); no `from` means the week before `to`. Longer ranges are
+ * refused, and nothing before the tenant's history window is loaded. Null when
+ * the whole range is before that window.
+ */
+export function resolveMessageRange(query: { from?: string, to?: string }, historyDays: number, now = Date.now()) {
+  const to = query.to ? new Date(query.to) : new Date(Math.ceil(now / MINUTE_MS) * MINUTE_MS)
+  const requestedFrom = query.from ? new Date(query.from) : new Date(to.getTime() - MAX_MESSAGE_RANGE_DAYS * DAY_MS)
+  if (to.getTime() - requestedFrom.getTime() > MAX_SPAN_MS) {
+    throw createError({ statusCode: 400, message: `Choose a range of ${MAX_MESSAGE_RANGE_DAYS} days or less` })
+  }
+  const historyStart = messageHistoryStart(historyDays, new Date(now))
+  const from = requestedFrom < historyStart ? historyStart : requestedFrom
+  return to <= from ? null : { from, to }
 }
 
 function toFieldValue(value: unknown): MessageFieldValue {

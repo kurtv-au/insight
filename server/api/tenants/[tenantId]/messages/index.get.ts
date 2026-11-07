@@ -1,17 +1,9 @@
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 
-const DAY_MS = 24 * 60 * 60 * 1000
-const MINUTE_MS = 60 * 1000
-/** Seven calendar days across a DST change are an hour longer */
-const MAX_SPAN_MS = MAX_MESSAGE_RANGE_DAYS * DAY_MS + 60 * MINUTE_MS
-
-const querySchema = z.object({
+const querySchema = messageRangeQuerySchema.extend({
   page: z.coerce.number().int().min(1).max(10_000).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(50),
-  from: z.iso.datetime({ offset: true }).optional(),
-  to: z.iso.datetime({ offset: true }).optional(),
-  q: z.string().trim().max(100).optional()
+  pageSize: z.coerce.number().int().min(1).max(100).default(50)
 })
 
 export default defineEventHandler(async (event) => {
@@ -25,17 +17,8 @@ export default defineEventHandler(async (event) => {
     return empty
   }
 
-  // No `to` means up to now (rounded up to the minute, so repeated requests
-  // share au-api's cache); no `from` means the week before `to`
-  const to = query.to ? new Date(query.to) : new Date(Math.ceil(Date.now() / MINUTE_MS) * MINUTE_MS)
-  const requestedFrom = query.from ? new Date(query.from) : new Date(to.getTime() - MAX_MESSAGE_RANGE_DAYS * DAY_MS)
-  if (to.getTime() - requestedFrom.getTime() > MAX_SPAN_MS) {
-    throw createError({ statusCode: 400, message: `Choose a range of ${MAX_MESSAGE_RANGE_DAYS} days or less` })
-  }
-  // Nothing before the tenant's history window
-  const historyStart = messageHistoryStart(tenant.recordingHistoryDays)
-  const from = requestedFrom < historyStart ? historyStart : requestedFrom
-  if (to <= from) {
+  const range = resolveMessageRange(query, tenant.recordingHistoryDays)
+  if (!range) {
     return empty
   }
 
@@ -47,8 +30,7 @@ export default defineEventHandler(async (event) => {
     tenantId,
     accountNumbers: accounts.map(account => account.accountNumber),
     fields,
-    from,
-    to,
+    ...range,
     q: query.q || undefined,
     offset: (query.page - 1) * query.pageSize,
     limit: query.pageSize

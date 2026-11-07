@@ -10,7 +10,8 @@ const independent = await Promise.all([
   import('../shared/utils/timezones'),
   import('../shared/utils/recordings'),
   import('../shared/utils/support'),
-  import('../shared/utils/messageFieldTypes')
+  import('../shared/utils/messageFieldTypes'),
+  import('../shared/utils/csv')
 ])
 for (const mod of independent) {
   Object.assign(globalThis, mod)

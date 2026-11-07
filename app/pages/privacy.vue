@@ -11,7 +11,7 @@ useSeoMeta({ title: 'Privacy Policy' })
       description="What Insight collects about you, why, and the choices you have."
     />
     <p class="mono-meta mt-6">
-      Last updated November 3, 2026
+      Last updated November 6, 2026
     </p>
 
     <div class="legal-prose mt-8">
@@ -43,6 +43,9 @@ useSeoMeta({ title: 'Privacy Policy' })
       </p>
       <p>
         Insight does not keep its own copy of messages or recordings. Each time you open one, Insight fetches it from Answer United’s message and recording systems over an encrypted connection and shows it to you. Insight stores only how each account’s messages are laid out: which message fields are shown and how they are labeled.
+      </p>
+      <p>
+        People who can see an account’s messages can download them as a spreadsheet (CSV file). The file is created when it is requested and Insight does not keep a copy. Once downloaded, it is on the person’s own device, and the client is responsible for how it is stored and shared.
       </p>
 
       <h2>2. Cookies and browser storage</h2>
