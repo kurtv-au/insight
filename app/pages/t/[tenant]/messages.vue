@@ -105,7 +105,25 @@ function clearFilters() {
 }
 
 // Calendar days become instants in the viewer's timezone; `to` is exclusive
+// Sorting: every shown column. Sorting by one that isn't shown (hidden since,
+// or no longer a field) goes back to newest first.
+const sort = computed<MessageSort>(() => {
+  const requested = resolveMessageSort(fields.value, queryString('sort'), queryString('dir'))
+  const shown = requested.fieldKey === null ? received.value : columns.value.includes(requested.fieldKey)
+  return shown ? requested : { fieldKey: null, direction: 'desc' }
+})
+
+function sortBy(fieldKey: string | null) {
+  const type = fieldKey === null ? null : fields.value.find(field => field.fieldKey === fieldKey)?.type ?? null
+  const first = messageSortDefault(type)
+  const direction = sort.value.fieldKey === fieldKey ? (sort.value.direction === 'asc' ? 'desc' : 'asc') : first
+  // Defaults stay out of the URL
+  updateQuery({ sort: fieldKey ?? undefined, dir: direction === first ? undefined : direction })
+}
+
 const apiQuery = computed(() => ({
+  sort: sort.value.fieldKey ?? undefined,
+  dir: isDefaultMessageSort(sort.value) ? undefined : sort.value.direction,
   page: filters.value.page,
   pageSize: PAGE_SIZE,
   q: filters.value.q,
@@ -135,9 +153,9 @@ async function exportCsv() {
   }
   exporting.value = true
   try {
-    const { q, from, to } = apiQuery.value
+    const { q, from, to, sort: sortKey, dir } = apiQuery.value
     const params = new URLSearchParams({ tz: timezone.value })
-    for (const [key, value] of Object.entries({ q, from, to })) {
+    for (const [key, value] of Object.entries({ q, from, to, sort: sortKey, dir })) {
       if (value) {
         params.set(key, value)
       }
@@ -184,7 +202,29 @@ function setDates(from?: CalendarDate, to?: CalendarDate) {
 
 // Table: columns come from the tenant's configured fields
 const selectedId = computed(() => queryString('m'))
-const tableColumns = computed(() => buildMessageColumns(fields.value, { timeZone: timezone.value, columns: columns.value, received: received.value }))
+const UButton = resolveComponent('UButton')
+const SORT_ICONS: Record<SortDirection, string> = { asc: 'i-lucide-arrow-up', desc: 'i-lucide-arrow-down' }
+
+function sortHeader(fieldKey: string | null, label: string) {
+  const active = sort.value.fieldKey === fieldKey
+  return h(UButton, {
+    'label': label,
+    'color': 'neutral',
+    'variant': 'ghost',
+    'trailingIcon': active ? SORT_ICONS[sort.value.direction] : 'i-lucide-arrow-up-down',
+    'class': '-mx-2.5 font-semibold',
+    'ui': { trailingIcon: active ? 'text-primary' : 'text-dimmed' },
+    'aria-label': active ? `${label}, sorted ${sort.value.direction === 'asc' ? 'ascending' : 'descending'}` : `Sort by ${label}`,
+    'onClick': () => sortBy(fieldKey)
+  })
+}
+
+const tableColumns = computed(() => buildMessageColumns(fields.value, {
+  timeZone: timezone.value,
+  columns: columns.value,
+  received: received.value,
+  header: sortHeader
+}))
 
 async function saveColumns(next: { columns: string[], received: boolean } | null) {
   if (next) {

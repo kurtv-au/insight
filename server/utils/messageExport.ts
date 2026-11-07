@@ -1,11 +1,39 @@
 import { formatFieldValue } from '../../shared/utils/messageFields'
 import type { MessageColumnField, MessageRow } from '../../shared/utils/messageFields'
+import type { MessageQuery, MessageSource, StoredMessage } from './messages'
 import { timezoneLabel } from '../../shared/utils/timezones'
 
-/** Messages one CSV export may hold; more means choose a shorter range or search */
+/** Messages one CSV export, or one sorted list, may hold; more means choose a shorter range or search */
 export const MAX_EXPORT_MESSAGES = 10_000
 /** au-api's largest page of /v1/messages */
 export const EXPORT_PAGE_SIZE = 500
+
+/**
+ * Every message matching the query, newest first, fetched in au-api's largest
+ * pages (au-api caches each week for a minute, so this is cheap after the
+ * first page). Refuses more than MAX_EXPORT_MESSAGES, checked from the first
+ * page's total before fetching the rest; `tooMany` words the refusal.
+ */
+export async function loadAllMessages(
+  source: Pick<MessageSource, 'list'>,
+  query: Omit<MessageQuery, 'offset' | 'limit'>,
+  tooMany: (total: number, max: number) => string
+): Promise<StoredMessage[]> {
+  const messages: StoredMessage[] = []
+  let total = Infinity
+  for (let offset = 0; offset < total; offset += EXPORT_PAGE_SIZE) {
+    const page = await source.list({ ...query, offset, limit: EXPORT_PAGE_SIZE })
+    total = page.total
+    if (total > MAX_EXPORT_MESSAGES) {
+      throw createError({ statusCode: 400, message: tooMany(total, MAX_EXPORT_MESSAGES) })
+    }
+    messages.push(...page.items)
+    if (!page.items.length) {
+      break
+    }
+  }
+  return messages
+}
 
 /** The fields an export has: every field the messages page shows, list or detail, in order */
 export function exportFields<T extends Pick<MessageColumnField, 'order' | 'showInList' | 'showInDetail'>>(fields: readonly T[]) {

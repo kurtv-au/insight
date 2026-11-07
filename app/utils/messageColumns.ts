@@ -1,4 +1,5 @@
 import type { TableColumn } from '@nuxt/ui'
+import type { VNode } from 'vue'
 
 /**
  * Table columns for messages, built from a tenant's configured fields. The
@@ -12,6 +13,8 @@ export function buildMessageColumns(
     received?: boolean
     /** The person's own choice of field keys; without it, the fields' list setting */
     columns?: readonly string[]
+    /** Renders a header, e.g. as a sort button; `fieldKey` is null for Received. Plain text without it. */
+    header?: (fieldKey: string | null, label: string) => VNode
   }
 ): TableColumn<MessageRow>[] {
   const columns: TableColumn<MessageRow>[] = []
@@ -19,7 +22,7 @@ export function buildMessageColumns(
   if (options.received !== false) {
     columns.push({
       id: 'createdAt',
-      header: 'Received',
+      header: options.header ? () => options.header!(null, 'Received') : 'Received',
       cell: ({ row }) => h('span', { class: 'whitespace-nowrap tabular-nums' }, formatDateTime(row.original.createdAt, options.timeZone))
     })
   }
@@ -28,7 +31,7 @@ export function buildMessageColumns(
     const numeric = field.type === 'number' || field.type === 'currency'
     columns.push({
       id: `field:${field.fieldKey}`,
-      header: field.label,
+      header: options.header ? () => options.header!(field.fieldKey, field.label) : field.label,
       cell: ({ row }) => messageCell(row.original.fields[field.fieldKey], field, options.timeZone, 'list'),
       meta: numeric ? { class: { th: 'text-right', td: 'text-right' } } : undefined
     })
