@@ -113,6 +113,42 @@ const { data: results, status, error: loadError, refresh } = useFetch(api, {
 })
 // 'idle' is the server render and the moment before the browser's first request
 const loading = computed(() => !!config.value?.configured && (status.value === 'pending' || status.value === 'idle'))
+
+// Export: every message matching the filters, across all pages, as CSV
+const exporting = ref(false)
+const canExport = computed(() => !!config.value?.configured && !loading.value && !loadError.value && results.value.total > 0)
+
+async function exportCsv() {
+  if (!canExport.value || exporting.value) {
+    return
+  }
+  exporting.value = true
+  try {
+    const { q, from, to } = apiQuery.value
+    const params = new URLSearchParams({ tz: timezone.value })
+    for (const [key, value] of Object.entries({ q, from, to })) {
+      if (value) {
+        params.set(key, value)
+      }
+    }
+    const response = await fetch(`${api}/export?${params}`, { headers: { accept: 'text/csv' } })
+    if (!response.ok) {
+      const body = await response.json().catch(() => null) as { message?: string } | null
+      throw new Error(body?.message || 'Couldn’t export these messages. Please try again.')
+    }
+    const name = /filename="([^"]+)"/.exec(response.headers.get('content-disposition') ?? '')?.[1] ?? 'messages.csv'
+    const url = URL.createObjectURL(await response.blob())
+    const link = Object.assign(document.createElement('a'), { href: url, download: name })
+    document.body.append(link)
+    link.click()
+    link.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  } catch (err) {
+    toast.add({ title: err instanceof Error && err.message !== 'Failed to fetch' ? err.message : 'Couldn’t export these messages. Please try again.', color: 'error' })
+  } finally {
+    exporting.value = false
+  }
+}
 const pageCount = computed(() => Math.max(1, Math.ceil(results.value.total / PAGE_SIZE)))
 
 // Search, debounced so each keystroke doesn't add a request or history entry
@@ -218,7 +254,22 @@ const rangeNote = computed(() => `Messages go back ${historyDays.value} ${histor
         :kicker="tenant?.name ?? 'Account'"
         title="Messages"
         :description="`Messages taken on your behalf. Times are shown in ${timezoneName}.`"
-      />
+      >
+        <template
+          v-if="config?.configured"
+          #actions
+        >
+          <UButton
+            label="Export CSV"
+            icon="i-lucide-download"
+            color="neutral"
+            variant="outline"
+            :loading="exporting"
+            :disabled="!canExport"
+            @click="exportCsv"
+          />
+        </template>
+      </PageHeader>
 
       <template v-if="config && !config.configured">
         <UAlert
