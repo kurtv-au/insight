@@ -43,6 +43,13 @@
       "when": 1793660650581,
       "tag": "0005_message_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1794057433465,
+      "tag": "0006_message_columns",
+      "breakpoints": true
     }
   ]
 }

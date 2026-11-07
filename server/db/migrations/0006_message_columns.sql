@@ -1,0 +1,1 @@
+ALTER TABLE `user_tenant_preferences` ADD `message_columns` json;
