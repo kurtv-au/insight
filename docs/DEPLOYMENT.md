@@ -355,9 +355,16 @@ aws ec2 authorize-security-group-ingress --group-id sg-0e82272f8fecdecb9 --ip-pe
 nc -vz -G 5 insight-v2.cv1n7igbuyzt.us-east-1.rds.amazonaws.com 3306      # from the office network
 ```
 
-Remote access over OpenVPN is different, because the OpenVPN server
-translates clients to its own VPC address. That needs a rule from its
-security group (`sg-008811c59ff2fd609`) instead.
+Remote access over OpenVPN (`openvpn.answerunited.com`, clients in
+`172.27.x`) is different, because the OpenVPN server translates clients to
+its own VPC address. `insight-db` therefore also allows MySQL from the
+OpenVPN Access Server's security group (`sg-008811c59ff2fd609`, rule
+`sgr-0d28cd6eef9e3303f`). Anyone on OpenVPN can reach the port, but still
+needs a MySQL user and TLS. To withdraw that access:
+
+```bash
+aws ec2 revoke-security-group-ingress --group-id sg-0e82272f8fecdecb9 --security-group-rule-ids sgr-0d28cd6eef9e3303f
+```
 
 In the client:
 - **Host:** `insight-v2.cv1n7igbuyzt.us-east-1.rds.amazonaws.com`, port 3306, database `insight`.
