@@ -39,3 +39,30 @@ export async function requireManageableMember(event: H3Event, { newRole }: { new
 
   return { tenantId, targetUserId }
 }
+
+/**
+ * Loads a member whose message filters the current user wants to change: an
+ * admin or owner of the tenant, and only an owner for an owner. Nobody but a
+ * platform admin changes their own filters, since removing them would widen
+ * what they can see.
+ */
+export async function requireFilterableMember(event: H3Event) {
+  const tenantId = getRouterParam(event, 'tenantId')!
+  const targetUserId = getRouterParam(event, 'userId')!
+
+  const { user: actor, role: actorRole } = await requireTenantRole(event, tenantId, 'admin')
+  if (actor.id === targetUserId && !actor.isPlatformAdmin) {
+    throw createError({ statusCode: 403, message: 'Someone else on the account has to change your filters' })
+  }
+
+  const target = await useDb().query.memberships.findFirst({
+    where: and(eq(tables.memberships.tenantId, tenantId), eq(tables.memberships.userId, targetUserId))
+  })
+  if (!target) {
+    throw createError({ statusCode: 404, message: 'Member not found' })
+  }
+  if (target.role === 'owner' && actorRole !== 'owner') {
+    throw createError({ statusCode: 403, message: 'Only owners can manage owners' })
+  }
+  return { tenantId, targetUserId, actor }
+}

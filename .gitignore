@@ -28,3 +28,4 @@ logs
 
 # v1 customer export (one-off import input, never commit)
 /v1-accounts/
+/insight-v1/

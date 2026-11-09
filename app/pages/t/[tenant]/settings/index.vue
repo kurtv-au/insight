@@ -234,12 +234,24 @@ async function removeAccountNumber(accountNumber: string) {
         </UCard>
       </section>
 
+      <section class="mt-10">
+        <SectionKicker
+          number="03"
+          label="Message filters"
+          class="mb-3"
+        />
+        <MessageFilterSettings
+          :tenant-id="tenantId"
+          :tenant-slug="tenant!.slug"
+        />
+      </section>
+
       <section
         v-if="recordingConfig && user?.isPlatformAdmin"
         class="mt-10"
       >
         <SectionKicker
-          number="03"
+          number="04"
           label="Recording setup"
           class="mb-3"
         />
@@ -375,7 +387,7 @@ async function removeAccountNumber(accountNumber: string) {
         class="mt-10"
       >
         <SectionKicker
-          number="04"
+          number="05"
           label="Message setup"
           class="mb-3"
         />

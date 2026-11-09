@@ -30,6 +30,17 @@ watch(() => [config.value?.columns, config.value?.received] as const, ([value, s
   }
 })
 
+// Message filters the account assigned this person: they see only matching messages
+const myFilters = computed(() => {
+  const names = config.value?.filters ?? []
+  const shown = names.length > 3 ? `${names.slice(0, 3).join(', ')} and ${names.length - 3} more` : names.join(', ')
+  return {
+    names,
+    summary: shown,
+    title: `Your account shows you only messages matching ${names.length === 1 ? 'this filter' : 'one of these filters'}: ${names.join(', ')}`
+  }
+})
+
 // Filters, page and the open message live in the URL
 function queryString(key: string) {
   const value = route.query[key]
@@ -461,6 +472,8 @@ const rangeNote = computed(() => `Messages go back ${historyDays.value} ${histor
             {{ results.total.toLocaleString('en-US') }} {{ results.total === 1 ? 'message' : 'messages' }}
           </template><template v-if="!loading && pageCount > 1">
             · page {{ filters.page }} of {{ pageCount }}
+          </template><template v-if="myFilters.names.length">
+            · <span :title="myFilters.title">only {{ myFilters.summary }}</span>
           </template><template v-if="results.mock">
             · sample data
           </template>

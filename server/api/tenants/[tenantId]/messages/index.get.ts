@@ -8,7 +8,7 @@ const querySchema = messageRangeQuerySchema.extend({
 
 export default defineEventHandler(async (event) => {
   const tenantId = getRouterParam(event, 'tenantId')!
-  const { tenant } = await requireTenantRole(event, tenantId, 'viewer')
+  const { user, tenant } = await requireTenantRole(event, tenantId, 'viewer')
   const query = await getValidatedQuery(event, querySchema.parse)
   const empty = { items: [] as MessageRow[], total: 0, mock: false }
 
@@ -26,7 +26,8 @@ export default defineEventHandler(async (event) => {
     where: eq(tables.tenantRecordingAccounts.tenantId, tenantId)
   })
   const source = messageSource()
-  const base = { tenantId, accountNumbers: accounts.map(account => account.accountNumber), fields, ...range, q: query.q || undefined }
+  const match = await memberMessageMatch(tenantId, user)
+  const base = { tenantId, accountNumbers: accounts.map(account => account.accountNumber), fields, ...range, q: query.q || undefined, match }
   const offset = (query.page - 1) * query.pageSize
 
   // Newest first is au-api's own order, so it pages there. Any other order

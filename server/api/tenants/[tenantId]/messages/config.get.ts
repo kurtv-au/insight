@@ -5,7 +5,11 @@ import { and, eq } from 'drizzle-orm'
 export default defineEventHandler(async (event) => {
   const tenantId = getRouterParam(event, 'tenantId')!
   const { user, tenant } = await requireTenantRole(event, tenantId, 'viewer')
-  const [fields, receivedSetting] = await Promise.all([visibleMessageFields(tenantId), messageReceivedSetting(tenantId)])
+  const [fields, receivedSetting, filters] = await Promise.all([
+    visibleMessageFields(tenantId),
+    messageReceivedSetting(tenantId),
+    memberMessageFilters(tenantId, user)
+  ])
 
   const preference = await useDb().query.userTenantPreferences.findFirst({
     where: and(eq(tables.userTenantPreferences.userId, user.id), eq(tables.userTenantPreferences.tenantId, tenantId))
@@ -32,6 +36,8 @@ export default defineEventHandler(async (event) => {
     received,
     // How the account shows when a message was received (both off: nowhere)
     receivedSetting: { ...receivedSetting, available: receivedAvailable(receivedSetting) },
+    // The person's message filters, by name: they see only messages matching one
+    filters: filters.map(filter => filter.name),
     // Messages share the recordings history setting
     historyDays: tenant.recordingHistoryDays,
     maxRangeDays: MAX_MESSAGE_RANGE_DAYS

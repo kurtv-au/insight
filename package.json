@@ -19,7 +19,8 @@
     "db:studio": "drizzle-kit studio",
     "admin:create": "node scripts/create-admin.ts",
     "import:v1": "node scripts/import-v1.ts",
-    "import:v1-fields": "node scripts/import-v1-fields.ts"
+    "import:v1-fields": "node scripts/import-v1-fields.ts",
+    "import:v1-filters": "node scripts/import-v1-filters.ts"
   },
   "dependencies": {
     "@aws-sdk/client-sesv2": "^3.1157.0",

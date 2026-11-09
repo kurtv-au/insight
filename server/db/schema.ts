@@ -145,6 +145,46 @@ export const tenantMessageFields = mysqlTable('tenant_message_fields', {
   uniqueIndex('tenant_message_fields_tenant_position_uq').on(table.tenantId, table.position)
 ])
 
+// Named message filters an account's owners and admins assign to members. A
+// member with any assigned sees only messages where one of them matches
+// (see shared/utils/messageFilters.ts).
+export const tenantMessageFilters = mysqlTable('tenant_message_filters', {
+  id: id(),
+  tenantId: varchar('tenant_id', { length: 36 }).notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 255 }).notNull(),
+  // The script's field name, as the script spells it; matched case-insensitively
+  fieldKey: varchar('field_key', { length: 128 }).notNull(),
+  // Matched exactly after trimming, ignoring case
+  value: varchar('value', { length: 255 }).notNull(),
+  updatedByUserId: varchar('updated_by_user_id', { length: 36 }).references(() => users.id, { onDelete: 'set null' }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt()
+}, table => [
+  index('tenant_message_filters_tenant_id_idx').on(table.tenantId)
+])
+
+// Which filters apply to which member. Removed with the membership or the filter.
+export const membershipMessageFilters = mysqlTable('membership_message_filters', {
+  tenantId: varchar('tenant_id', { length: 36 }).notNull(),
+  userId: varchar('user_id', { length: 36 }).notNull(),
+  filterId: varchar('filter_id', { length: 36 }).notNull(),
+  createdAt: createdAt()
+}, table => [
+  primaryKey({ columns: [table.tenantId, table.userId, table.filterId] }),
+  index('membership_message_filters_filter_id_idx').on(table.filterId),
+  // Named explicitly: the generated names are longer than MySQL's 64-character limit
+  foreignKey({
+    name: 'membership_message_filters_filter_fk',
+    columns: [table.filterId],
+    foreignColumns: [tenantMessageFilters.id]
+  }).onDelete('cascade'),
+  foreignKey({
+    name: 'membership_message_filters_membership_fk',
+    columns: [table.tenantId, table.userId],
+    foreignColumns: [memberships.tenantId, memberships.userId]
+  }).onDelete('cascade')
+])
+
 export const invitations = mysqlTable('invitations', {
   id: id(),
   tenantId: varchar('tenant_id', { length: 36 }).notNull().references(() => tenants.id, { onDelete: 'cascade' }),

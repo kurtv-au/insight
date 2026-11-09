@@ -8,6 +8,11 @@ import type { MessageQuery, MessageSource, StoredMessage } from '../utils/messag
 // Fields are requested by the tenant's configured fieldKeys (the script's names,
 // which au-api matches case-insensitively and echoes back as sent). Search runs
 // in au-api over exactly those fields, so it only matches what the tenant sees.
+//
+// A member's message filters go as `match`, which au-api applies before
+// totals and paging. Its fields are read for matching and never returned or
+// searched. au-api versions without `match` would silently ignore it, so a
+// page that doesn't confirm it (meta.match) is refused rather than shown.
 
 /** A message as /v1/messages publishes it */
 interface ApiMessage {
@@ -20,7 +25,7 @@ interface ApiMessage {
 
 interface ApiPage {
   data: ApiMessage[]
-  meta: { total: number }
+  meta: { total: number, match?: boolean }
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -35,6 +40,11 @@ export const MESSAGES_UNAVAILABLE = 'Messages aren’t available right now'
 
 function auApi<T>(path: string, query: Record<string, string | number | undefined>) {
   return auApiGet<T>(path, query, { tag: 'messages', unavailableMessage: MESSAGES_UNAVAILABLE, timeout: TIMEOUT_MS })
+}
+
+/** au-api's `match` parameter, or undefined for no filters */
+export function matchParam(match: MessageMatch | null | undefined) {
+  return match ? JSON.stringify(match) : undefined
 }
 
 /**
@@ -134,15 +144,26 @@ export const auApiMessages: MessageSource = {
       return { items: [], total: 0 }
     }
 
-    const page = (window: { from: Date, to: Date }, offset: number, limit: number) => auApi<ApiPage>('/v1/messages', {
-      fields: names.join(','),
-      clientNumber: clientNumbers.join(','),
-      from: window.from.toISOString(),
-      to: window.to.toISOString(),
-      q: query.q || undefined,
-      offset,
-      limit
-    })
+    const match = matchParam(query.match)
+    const page = async (window: { from: Date, to: Date }, offset: number, limit: number) => {
+      const result = await auApi<ApiPage>('/v1/messages', {
+        fields: names.join(','),
+        clientNumber: clientNumbers.join(','),
+        from: window.from.toISOString(),
+        to: window.to.toISOString(),
+        q: query.q || undefined,
+        match,
+        offset,
+        limit
+      })
+      // Filtered but not confirmed: this au-api ignored `match`, so these
+      // would be every message. Never show them.
+      if (match && result && result.meta.match !== true) {
+        console.error('[messages] au-api did not apply match; refusing the page')
+        throw createError({ statusCode: 503, message: MESSAGES_UNAVAILABLE })
+      }
+      return result
+    }
 
     // The newest window with the page asked for; the others just for their totals.
     // au-api caches each window for a minute, so the second round below is cheap.
@@ -169,10 +190,13 @@ export const auApiMessages: MessageSource = {
     if (!/^\d{1,10}$/.test(id) || Number(id) < 1 || Number(id) > MAX_MESSAGE_ID) {
       return null
     }
-    const names = fieldNamesFor(query)
-    if (!names.length) {
+    const visible = fieldNamesFor(query)
+    if (!visible.length) {
       return null
     }
+    // The match fields too, so the caller can check the filters. They come
+    // first: a visible field left out over the limit just shows empty.
+    const names = requestedFieldNames([...messageMatchFields(query.match ?? null), ...visible].map(fieldKey => ({ fieldKey })))
     const result = await auApi<{ data: ApiMessage }>(`/v1/messages/${id}`, { fields: names.join(',') })
     // The key spans every client: only this tenant's numbers count
     if (!result || !query.accountNumbers.includes(String(result.data.clientNumber))) {

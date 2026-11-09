@@ -12,8 +12,9 @@
  *   number, with a warning.
  * - Every tenant is active with the default 365 days of history; every member
  *   is a viewer, and owners are assigned afterwards.
- * - Users with v1 message filters are imported disabled: Insight has no
- *   per-user filters, so enabling them would widen what they can see.
+ * - Users with v1 message filters are imported disabled, so they never see
+ *   more than v1 showed them. `pnpm import:v1-filters` imports their filters
+ *   and re-enables them.
  * - Passwords are never read. Users sign in with an emailed link.
  */
 import { DEFAULT_RECORDING_HISTORY_DAYS } from '../../shared/utils/recordings.ts'
