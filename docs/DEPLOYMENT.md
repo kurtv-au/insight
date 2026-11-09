@@ -681,3 +681,26 @@ What it does:
    - Assign an owner per tenant in `/admin/tenants`, and check its message
      fields and filters.
    - Delete the export from your laptop.
+
+### Retiring insight.answerunited.com
+
+The old Insight (`insight.answerunited.com`, a Vaadin app whose sign-in page is
+`/login.html`) goes away by redirecting to this one. Its users were imported
+without passwords, so their first sign-in has to be by emailed link. Three
+things steer them there:
+
+- **`/welcome`** is a public, printable walkthrough of that first sign-in.
+  Link it in the announcement email:
+  `https://insight.answerunited.net/welcome`.
+- **`/login?from=v1`** shows a banner on the sign-in page ("Insight has a new
+  home… your old password doesn't carry over") with a link to `/welcome`.
+- **Every failed password sign-in** says to use "Email me a sign-in link" if
+  you haven't set a password here. The message is the same for every failure,
+  so it doesn't reveal which accounts exist.
+
+Point the old site's 301 at `https://insight.answerunited.net/login?from=v1`
+for every path. The old app routes with `#!` fragments, which never reach the
+server, so nothing finer is needed. If the redirect can only keep the path,
+that works too: `/login.html` 301s to `/login?from=v1` (`routeRules` in
+`nuxt.config.ts`), and `/` lands on the sign-in page, where the "Used the old
+Insight?" link and the failed-password hint still apply.

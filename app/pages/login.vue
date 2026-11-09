@@ -19,6 +19,10 @@ const step = ref<'credentials' | 'code'>('credentials')
 const code = ref<string[]>([])
 const loading = ref<'password' | 'email' | 'code' | 'passkey' | null>(null)
 const error = ref('')
+// A refused password: most likely someone from the old Insight, who has none here yet
+const passwordRefused = ref(false)
+// The old site's redirect lands here with ?from=v1 (see docs/DEPLOYMENT.md)
+const fromOldInsight = computed(() => route.query.from === 'v1')
 
 async function finishSignIn() {
   await refreshSession()
@@ -28,10 +32,12 @@ async function finishSignIn() {
 async function run(kind: NonNullable<typeof loading.value>, action: () => Promise<void>) {
   loading.value = kind
   error.value = ''
+  passwordRefused.value = false
   try {
     await action()
   } catch (err) {
     error.value = errorMessage(err)
+    passwordRefused.value = kind === 'password' && (err as { statusCode?: number }).statusCode === 401
   } finally {
     loading.value = null
   }
@@ -88,7 +94,24 @@ function signInWithPasskey() {
       title="Welcome back."
     >
       Insight is invite only. Use the email your invitation was sent to.
+      <ULink
+        v-if="!fromOldInsight"
+        to="/welcome"
+        class="mt-2 block text-[14px] text-cobalt-text underline underline-offset-3"
+      >
+        Used the old Insight? See how to sign in
+      </ULink>
     </AuthHeading>
+
+    <UAlert
+      v-if="fromOldInsight && step === 'credentials' && !error"
+      color="primary"
+      variant="subtle"
+      icon="i-lucide-sparkles"
+      title="Insight has a new home"
+      description="Your old password doesn’t carry over. Enter the email you used before and choose Email me a sign-in link."
+      :actions="[{ label: 'How it works', to: '/welcome', color: 'primary', variant: 'link', trailingIcon: 'i-lucide-arrow-right', class: 'px-0' }]"
+    />
 
     <UAlert
       v-if="error"
@@ -96,6 +119,7 @@ function signInWithPasskey() {
       variant="subtle"
       icon="i-lucide-circle-alert"
       :description="error"
+      :actions="passwordRefused ? [{ label: 'Email me a sign-in link', icon: 'i-lucide-mail', color: 'neutral', variant: 'outline', loading: loading === 'email', onClick: requestEmailLink }] : undefined"
     />
 
     <template v-if="step === 'credentials'">

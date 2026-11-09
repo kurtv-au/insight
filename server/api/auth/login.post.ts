@@ -18,7 +18,9 @@ export default defineEventHandler(async (event) => {
   const valid = await verifyPassword(user?.passwordHash ?? await dummyHash, password)
 
   if (!user?.passwordHash || !valid || user.disabledAt) {
-    throw createError({ statusCode: 401, message: 'Invalid email or password' })
+    // The same for every failure, so it doesn't reveal which accounts exist or
+    // have a password. People from the old Insight have none here yet.
+    throw createError({ statusCode: 401, message: 'Invalid email or password. If you haven’t set a password in this Insight, use Email me a sign-in link.' })
   }
 
   if (passwordNeedsReHash(user.passwordHash)) {
