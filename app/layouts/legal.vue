@@ -20,6 +20,7 @@ const { loggedIn } = useUserSession()
         color="neutral"
         variant="outline"
         size="sm"
+        class="print:hidden"
       />
     </header>
 

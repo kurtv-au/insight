@@ -131,7 +131,7 @@ Orphan state is decided at save time. If a script later drops a field, the messa
 
 Tenant pages live under `/t/[slug]`, and tenant APIs under `/api/tenants/[tenantId]`. Every tenant API checks the caller's role with `requireTenantRole()` (`server/utils/auth.ts`). Roles are always read from the database, never from the session cookie.
 
-**Sign-in methods.** Password, emailed one-time link or 6-digit code (valid 15 minutes, 5 attempts), and passkeys (WebAuthn, added from the Account page). Sessions are sealed cookies. Changing a password, resetting it, or choosing **Sign out other devices** bumps the user's `sessionVersion`, which invalidates every other session.
+**Sign-in methods.** Password, emailed one-time link or 6-digit code (valid 15 minutes, 5 attempts), and passkeys (WebAuthn, added from the Account page). Sessions are sealed cookies. Changing a password, resetting it, or choosing **Sign out other devices** bumps the user's `sessionVersion`, which invalidates every other session. People moving from the old Insight (`insight.answerunited.com`, email and password only) were imported without a password: the public `/welcome` page walks them through a first sign-in by emailed link, `/login?from=v1` (where the old site's redirect points) shows a banner pointing there, `/login.html` 301s to it, and a failed password sign-in says to use the emailed link. See `docs/DEPLOYMENT.md`, "Retiring insight.answerunited.com".
 
 **Legal pages.** `/terms` and `/privacy` are public and use the `legal` layout. They're linked from the sign-in footer, the account menu and the Account page. When the app's data handling changes (new data stored, new providers, analytics), update `app/pages/privacy.vue` and its *Last updated* date.
 

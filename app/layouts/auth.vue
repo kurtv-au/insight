@@ -22,7 +22,10 @@
 
       <div class="mt-6 flex flex-col items-center gap-2">
         <p class="mono-meta">
-          Trouble signing in? <a
+          Trouble signing in? <NuxtLink
+            to="/welcome"
+            class="hover:text-default"
+          >How to sign in</NuxtLink> · <a
             href="tel:+18002590135"
             class="hover:text-default"
           >(800) 259-0135</a>

@@ -60,6 +60,11 @@ export default defineNuxtConfig({
     }
   },
 
+  routeRules: {
+    // The old Insight's sign-in page, for a redirect that keeps the path
+    '/login.html': { redirect: { to: '/login?from=v1', statusCode: 301 } }
+  },
+
   compatibilityDate: '2026-06-30',
 
   auth: {
