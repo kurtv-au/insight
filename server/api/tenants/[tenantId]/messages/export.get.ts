@@ -7,7 +7,7 @@ const querySchema = messageRangeQuerySchema.extend({
 
 /**
  * Every message matching the messages page's filters (date range and search,
- * across all pages), in its sort order, as a CSV download. Same access, range rules and visible
+ * across all pages, within the person's message filters), in its sort order, as a CSV download. Same access, range rules and visible
  * fields as the list: hidden fields never leave, as on the page.
  */
 export default defineEventHandler(async (event) => {
@@ -25,7 +25,8 @@ export default defineEventHandler(async (event) => {
     const accounts = await useDb().query.tenantRecordingAccounts.findMany({
       where: eq(tables.tenantRecordingAccounts.tenantId, tenantId)
     })
-    const base = { tenantId, accountNumbers: accounts.map(account => account.accountNumber), fields, ...range, q: query.q || undefined }
+    const match = await memberMessageMatch(tenantId, user)
+    const base = { tenantId, accountNumbers: accounts.map(account => account.accountNumber), fields, ...range, q: query.q || undefined, match }
     const all = await loadAllMessages(messageSource(), base, (total, max) =>
       `That’s ${total.toLocaleString('en-US')} messages, more than the ${max.toLocaleString('en-US')} an export can hold. Choose a shorter range or search.`)
     // In the list's order: au-api's newest first, unless the list is sorted otherwise

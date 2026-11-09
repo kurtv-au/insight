@@ -6,11 +6,16 @@ import type { MessageQuery, MessageSource, StoredMessage } from '../utils/messag
 
 const COUNT = 57
 
-function generate(query: Pick<MessageQuery, 'accountNumbers' | 'fields'>): StoredMessage[] {
+function generate(query: Pick<MessageQuery, 'accountNumbers' | 'fields' | 'match'>): StoredMessage[] {
   // Anchored to the hour, so pages and deep links agree between requests
   const now = new Date()
   now.setUTCMinutes(0, 0, 0)
-  return sampleMessageRows(query.fields, { count: COUNT, now, accountNumber: query.accountNumbers[0] ?? null })
+  // Filter fields the page doesn't show get text values, read for matching only
+  const shown = new Set(query.fields.map(field => canonicalFieldKey(field.fieldKey)))
+  const extra = messageMatchFields(query.match ?? null)
+    .filter(fieldKey => !shown.has(canonicalFieldKey(fieldKey)))
+    .map(fieldKey => ({ fieldKey, type: 'text' as const, format: {} }))
+  return sampleMessageRows([...query.fields, ...extra], { count: COUNT, now, accountNumber: query.accountNumbers[0] ?? null })
     .map(row => ({
       id: row.id.replace('sample', 'mock'),
       createdAt: row.createdAt ? new Date(row.createdAt) : null,
@@ -24,6 +29,9 @@ function matches(message: StoredMessage, query: MessageQuery) {
     return false
   }
   if (query.to && (!message.createdAt || message.createdAt >= query.to)) {
+    return false
+  }
+  if (!messageMatches(message.values, query.match ?? null)) {
     return false
   }
   if (!query.q) {

@@ -588,11 +588,11 @@ What it does:
   sign in with "Email me a sign-in link".
 - No email is sent. Owners are assigned afterwards from each tenant's members
   page.
-- Users who had v1 message filters are imported **disabled**, because Insight
-  has no per-user filters and they would see all of the account's messages.
-  Enable them one by one once that's agreed.
-- Message fields, message filters, locations and v1 passwords are not
-  imported.
+- Users who had v1 message filters are imported **disabled**, so they can't
+  see all of the account's messages before their filters exist. Step 5
+  imports the filters and re-enables them.
+- Message fields and message filters are imported by the later steps.
+  Locations and v1 passwords are not imported.
 - Validation errors stop the import before anything is written.
 - Output is counts and v1 ids only.
 - Re-running reuses what's already there. A tenant whose slug or account
@@ -647,8 +647,37 @@ What it does:
    pnpm import:v1-fields v1-accounts --apply   # one transaction
    ```
 
-5. Afterwards:
+5. Message filters. `scripts/import-v1-filters.ts` creates each tenant's
+   message filters from `message_filters.csv` and assigns them from
+   `users_messagefilters.csv`. **au-api 1.18.0 or later must be live first**:
+   Insight refuses a filtered person's messages (503) from an au-api that
+   doesn't apply `match`.
+   - v1's filter table has no account column. A filter goes to the one
+     account its active users belong to. Without active users, it goes to the
+     one imported account whose v1 message fields include its field.
+     Anything else is skipped and listed by v1 id. In the 2026-11 export
+     that's the DEPARTMENT and TIMESCALLED filters, which only deleted users
+     had.
+   - The field must be in the tenant's message setup (step 4), stored in its
+     spelling. The same field and value in one account are merged (v1's
+     GLTri and GLTRI).
+   - Users disabled by step 3 are re-enabled when they had v1 filters, weren't
+     locked in v1, and now have at least one filter. The dry run lists them by
+     v1 id.
+   - Filters with the same field and value are reused, and only missing
+     assignments are added, so re-running is safe.
+   - Once filters exist, don't roll Insight back past the release that added
+     them (2.7.0): earlier releases ignore filters and would show filtered
+     people every message. Disable them first if you must.
+
+   In the same shell, before the `unset`:
+
+   ```bash
+   pnpm import:v1-filters v1-accounts           # dry run: filters, assignments, users to re-enable, skips
+   pnpm import:v1-filters v1-accounts --apply   # one transaction
+   ```
+
+6. Afterwards:
    - Assign an owner per tenant in `/admin/tenants`, and check its message
-     fields.
-   - Enable the disabled users when agreed.
+     fields and filters.
    - Delete the export from your laptop.

@@ -50,6 +50,7 @@ beforeEach(() => {
     visibleMessageFields: vi.fn(async () => fields),
     messageReceivedSetting: vi.fn(async () => ({ showInList: true, showInDetail: true })),
     resolveMessageRange: vi.fn(() => range),
+    memberMessageMatch: vi.fn(async () => null),
     list
   }
   vi.stubGlobal('defineEventHandler', (handler: Handler) => handler)
@@ -92,6 +93,13 @@ describe('GET /api/tenants/:tenantId/messages/export', () => {
     await expect((await load())({})).rejects.toMatchObject({ statusCode: 404 })
     expect(mocks.requireTenantRole).toHaveBeenCalledWith({}, 'tenant-1', 'viewer')
     expect(mocks.list).not.toHaveBeenCalled()
+  })
+
+  it('loads only messages matching the person’s filters', async () => {
+    mocks.memberMessageMatch!.mockResolvedValue({ GALLEY: ['GL7112'] })
+    await (await load())({})
+    expect(mocks.memberMessageMatch).toHaveBeenCalledWith('tenant-1', { id: 'user-1' })
+    expect(mocks.list!.mock.calls.every(([q]) => q.match?.GALLEY?.[0] === 'GL7112')).toBe(true)
   })
 
   it('rate-limits per user', async () => {

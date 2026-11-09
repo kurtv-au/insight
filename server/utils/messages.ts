@@ -25,6 +25,11 @@ export interface MessageQuery {
   /** Exclusive */
   to?: Date
   q?: string
+  /**
+   * The member's message filters: only messages where one of them matches.
+   * Their fields are read for matching only, never returned or searched.
+   */
+  match?: MessageMatch | null
   offset: number
   limit: number
 }
@@ -34,8 +39,11 @@ export interface MessageSource {
   readonly isMock: boolean
   /** Newest first, one page at a time */
   list(query: MessageQuery): Promise<{ items: StoredMessage[], total: number }>
-  /** One message, only if it belongs to one of the query's account numbers */
-  get(id: string, query: Pick<MessageQuery, 'tenantId' | 'accountNumbers' | 'fields'>): Promise<StoredMessage | null>
+  /**
+   * One message, only if it belongs to one of the query's account numbers.
+   * Its values include the match fields, so the caller can check the match.
+   */
+  get(id: string, query: Pick<MessageQuery, 'tenantId' | 'accountNumbers' | 'fields' | 'match'>): Promise<StoredMessage | null>
 }
 
 /**

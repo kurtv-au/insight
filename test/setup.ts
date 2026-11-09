@@ -18,3 +18,4 @@ for (const mod of independent) {
 }
 Object.assign(globalThis, await import('../shared/utils/schemas'))
 Object.assign(globalThis, await import('../shared/utils/messageFields'))
+Object.assign(globalThis, await import('../shared/utils/messageFilters'))

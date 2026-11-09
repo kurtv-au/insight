@@ -21,8 +21,72 @@ const { data: invitations, refresh: refreshInvitations } = await useFetch(`${api
   default: () => []
 })
 
+const { data: filterData, refresh: refreshFilters } = await useFetch(`${apiBase}/message-filters`, {
+  immediate: can('admin'),
+  default: () => ({ filters: [] as MessageFilterDto[], fields: [] })
+})
+
 type Member = typeof members.value[number]
 type Invitation = typeof invitations.value[number]
+
+// Message filters: a member with any sees only messages matching one of them
+const filtersById = computed(() => new Map(filterData.value.filters.map(filter => [filter.id, filter])))
+function filterNames(member: Member) {
+  return member.filterIds
+    .map(id => filtersById.value.get(id)?.name)
+    .filter((name): name is string => !!name)
+    .sort((a, b) => a.localeCompare(b))
+}
+// Someone else has to change your filters, unless you're a platform admin
+function canFilter(member: Member) {
+  return canManage(member) && (member.userId !== user.value?.id || !!user.value?.isPlatformAdmin)
+}
+const fieldLabels = computed(() => new Map(filterData.value.fields.map(field => [canonicalFieldKey(field.fieldKey), field.label])))
+const filterItems = computed(() => filterData.value.filters.map(filter => ({
+  label: filter.name,
+  value: filter.id,
+  description: `${fieldLabels.value.get(canonicalFieldKey(filter.fieldKey)) ?? filter.fieldKey} = ${filter.value}`
+})))
+
+const filtersOpen = ref(false)
+const filtersMember = ref<Member | null>(null)
+const chosenFilters = ref<string[]>([])
+const savingFilters = ref(false)
+
+function openFilters(member: Member) {
+  filtersMember.value = member
+  chosenFilters.value = [...member.filterIds]
+  filtersOpen.value = true
+}
+
+async function saveFilters() {
+  const member = filtersMember.value
+  if (!member) {
+    return
+  }
+  const who = member.name || member.email
+  if (!chosenFilters.value.length && member.filterIds.length) {
+    const confirmed = await confirm({
+      title: `Remove all of ${who}’s filters?`,
+      description: 'They’ll see every message in this account.',
+      confirmLabel: 'Remove filters'
+    })
+    if (!confirmed) {
+      return
+    }
+  }
+  savingFilters.value = true
+  try {
+    await $fetch(`${apiBase}/members/${member.userId}/message-filters`, { method: 'PUT', body: { filterIds: chosenFilters.value } })
+    toast.add({ title: `${who}’s message filters saved`, color: 'success' })
+    filtersOpen.value = false
+    await Promise.all([refreshMembers(), refreshFilters()])
+  } catch (err) {
+    toast.add({ title: errorMessage(err), color: 'error' })
+  } finally {
+    savingFilters.value = false
+  }
+}
 
 // Mirrors the server rules; the server still enforces them
 function canManage(member: Member) {
@@ -77,14 +141,18 @@ async function revokeInvitation(invitation: Invitation) {
   }
 }
 
-function memberActions(member: Member): DropdownMenuItem[] {
+function memberActions(member: Member): DropdownMenuItem[][] {
   const isSelf = member.userId === user.value?.id
-  return [{
+  const remove: DropdownMenuItem = {
     label: isSelf ? 'Leave account' : 'Remove from account',
     icon: isSelf ? 'i-lucide-log-out' : 'i-lucide-user-minus',
     color: 'error',
     onSelect: () => removeMember(member)
-  }]
+  }
+  if (!canFilter(member)) {
+    return [[remove]]
+  }
+  return [[{ label: 'Message filters…', icon: 'i-lucide-filter', onSelect: () => openFilters(member) }], [remove]]
 }
 
 const inviteOpen = ref(false)
@@ -173,6 +241,25 @@ async function onInvite(event: FormSubmitEvent<z.output<typeof inviteSchema>>) {
                 </template>
                 last sign-in {{ formatDateTime(member.lastLoginAt) }}
               </p>
+              <p
+                v-if="member.filterIds.length"
+                class="mt-1 flex flex-wrap items-center gap-1"
+              >
+                <span class="sr-only">Sees messages matching:</span>
+                <UIcon
+                  name="i-lucide-filter"
+                  class="size-3.5 text-muted"
+                  aria-hidden="true"
+                />
+                <UBadge
+                  v-for="name in filterNames(member)"
+                  :key="name"
+                  :label="name"
+                  color="neutral"
+                  variant="subtle"
+                  size="sm"
+                />
+              </p>
             </div>
             <USelect
               v-if="canManage(member)"
@@ -257,6 +344,47 @@ async function onInvite(event: FormSubmitEvent<z.output<typeof inviteSchema>>) {
         </p>
       </section>
     </template>
+    <UModal
+      v-model:open="filtersOpen"
+      :title="`Message filters for ${filtersMember?.name || filtersMember?.email}`"
+      description="They see only messages where one of these filters matches. With none, they see every message."
+    >
+      <template #body>
+        <USelectMenu
+          v-if="filterItems.length"
+          v-model="chosenFilters"
+          :items="filterItems"
+          value-key="value"
+          multiple
+          placeholder="No filters: every message"
+          class="w-full"
+          aria-label="Message filters"
+        />
+        <AsideNote v-else>
+          This account has no message filters yet. Add them in
+          <ULink
+            :to="`/t/${tenant?.slug}/settings`"
+            class="underline"
+          >Settings</ULink>.
+        </AsideNote>
+      </template>
+      <template #footer>
+        <div class="flex w-full justify-end gap-2">
+          <UButton
+            label="Cancel"
+            color="neutral"
+            variant="outline"
+            @click="filtersOpen = false"
+          />
+          <UButton
+            label="Save"
+            :loading="savingFilters"
+            :disabled="!filterItems.length"
+            @click="saveFilters"
+          />
+        </div>
+      </template>
+    </UModal>
     <UModal
       v-model:open="inviteOpen"
       title="Invite a member"

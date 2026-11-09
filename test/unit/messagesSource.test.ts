@@ -21,6 +21,7 @@ const auApiGet = vi.fn(async (path: string, query: Query) => {
   return respond(call)
 })
 vi.stubGlobal('auApiGet', auApiGet)
+vi.stubGlobal('createError', ({ statusCode, message }: { statusCode: number, message: string }) => Object.assign(new Error(message), { statusCode }))
 
 const { auApiMessages, paginateWindows, requestedFieldNames, splitRange } = await import('../../server/messages/au-api')
 
@@ -165,6 +166,25 @@ describe('auApiMessages.list', () => {
     expect(result.items.map(message => message.id)).toEqual(['102', '200', '201'])
   })
 
+  it('sends a member’s filters as match, and refuses a page au-api didn’t filter', async () => {
+    const match = { GALLEY: ['GL7112', 'GL535'] }
+    respond = () => ({ data: [apiMessage(1)], meta: { total: 1, match: true } })
+    const result = await auApiMessages.list(listQuery({ match }))
+    expect(calls[0]!.query.match).toBe('{"GALLEY":["GL7112","GL535"]}')
+    // The filter field is matched in au-api, not requested as a column
+    expect(calls[0]!.query.fields).toBe('Name,Phone')
+    expect(result.total).toBe(1)
+
+    // An au-api without `match` ignores it and would return every message
+    respond = () => ({ data: [apiMessage(1)], meta: { total: 1 } })
+    await expect(auApiMessages.list(listQuery({ match }))).rejects.toMatchObject({ statusCode: 503 })
+  })
+
+  it('sends no match for an unfiltered member', async () => {
+    await auApiMessages.list(listQuery({ match: null }))
+    expect(calls[0]!.query.match).toBeUndefined()
+  })
+
   it('keeps a missing or bad takenAt as null', async () => {
     respond = () => ({ data: [apiMessage(1, { takenAt: null }), apiMessage(2, { takenAt: 'nope' })], meta: { total: 2 } })
     const { items } = await auApiMessages.list(listQuery())
@@ -180,6 +200,12 @@ describe('auApiMessages.get', () => {
     const message = await auApiMessages.get('19291444', query)
     expect(calls[0]).toEqual({ path: '/v1/messages/19291444', query: { fields: 'Name' } })
     expect(message?.id).toBe('19291444')
+  })
+
+  it('also asks for the filter fields, so the route can check them', async () => {
+    respond = () => ({ data: apiMessage(5) })
+    await auApiMessages.get('5', { ...query, match: { GALLEY: ['GL7112'], name: ['x'] } })
+    expect(calls[0]!.query).toEqual({ fields: 'GALLEY,name' })
   })
 
   it('refuses a message from a client number the tenant doesn’t have', async () => {
