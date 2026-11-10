@@ -31,7 +31,12 @@ const accountMenu = computed<DropdownMenuItem[][]>(() => [
   [
     { label: 'Account', icon: 'i-lucide-circle-user-round', to: '/account' },
     { label: 'Help & support', icon: 'i-lucide-life-buoy', to: supportTo.value },
-    ...(user.value?.isPlatformAdmin ? [{ label: 'Admin', icon: 'i-lucide-shield', to: '/admin/tenants' }] : []),
+    ...(user.value?.isPlatformAdmin
+      ? [
+          { label: 'Admin', icon: 'i-lucide-shield', to: '/admin/tenants' },
+          { label: 'Platform admins', icon: 'i-lucide-shield-check', to: '/admin/admins' }
+        ]
+      : []),
     {
       label: colorMode.value === 'dark' ? 'Light mode' : 'Dark mode',
       icon: colorMode.value === 'dark' ? 'i-lucide-sun' : 'i-lucide-moon',
