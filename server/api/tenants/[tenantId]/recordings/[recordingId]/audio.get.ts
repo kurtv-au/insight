@@ -17,7 +17,8 @@ export default defineEventHandler(async (event) => {
     'Content-Type': type && type !== 'application/octet-stream' ? type : 'audio/mpeg',
     // Listen-only: played in the page, not offered as a download
     'Content-Disposition': 'inline',
-    'Cache-Control': 'private, max-age=3600'
+    // Customer audio: not left in the browser's cache after signing out
+    'Cache-Control': 'private, no-store'
   })
   return audio.body ? sendStream(event, audio.body) : null
 })

@@ -8,7 +8,7 @@ const bodySchema = z.object({
 
 export default defineEventHandler(async (event) => {
   const body = await readValidatedBody(event, bodySchema.parse)
-  await rateLimitAuth(event, 'invite-accept')
+  rateLimitAuth(event, 'invite-accept')
 
   const invitation = await findPendingInvitation(getRouterParam(event, 'token')!)
   if (!invitation) {
@@ -66,6 +66,12 @@ export default defineEventHandler(async (event) => {
   }
 
   const user = (await db.query.users.findFirst({ where: eq(tables.users.id, userId) }))!
+  await recordAudit(user, {
+    action: 'invitation.accepted',
+    tenant: invitation.tenant,
+    target: invitation.email,
+    details: { role: invitation.role }
+  })
   await startSession(event, user)
   return { tenantSlug: invitation.tenant.slug, tenantStatus: invitation.tenant.status }
 })

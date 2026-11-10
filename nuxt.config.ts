@@ -34,6 +34,12 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
+    // nuxt-auth-utils' sealed cookie session. A sign-in lasts 30 days from when
+    // it started: the cookie expires then, and h3 refuses older sealed data, so
+    // a copied cookie stops working too.
+    session: {
+      maxAge: 60 * 60 * 24 * 30
+    },
     databaseUrl: '',
     email: {
       from: 'Insight <no-reply@answerunited.com>',
@@ -43,6 +49,9 @@ export default defineNuxtConfig({
     aws: {
       region: 'us-east-1'
     },
+    // Email domains platform admins must be at (comma-separated). Checked when
+    // someone is made one; see shared/utils/platformAdmins.ts
+    platformAdminDomains: 'answerunited.com',
     support: {
       // Where the /support form is delivered
       email: ''

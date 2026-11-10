@@ -4,9 +4,19 @@ export function errorMessage(error: unknown, fallback = 'Something went wrong. P
   return err?.data?.message || fallback
 }
 
-/** Only allows same-site relative redirects, to prevent open redirects */
+/**
+ * Only allows same-site relative redirects, to prevent open redirects. Browsers
+ * read a backslash as a slash (so "/\evil.com" is "//evil.com") and drop tabs
+ * and line breaks, so those are refused too.
+ */
 export function safeRedirect(value: unknown, fallback = '/') {
-  return typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') ? value : fallback
+  return typeof value === 'string'
+    && value.startsWith('/')
+    && !value.startsWith('//')
+    // eslint-disable-next-line no-control-regex
+    && !/[\\\u0000-\u001f\u007f]/.test(value)
+    ? value
+    : fallback
 }
 
 // Pages format through useTimezone(), which passes the viewer's effective timezone.
@@ -33,12 +43,6 @@ export function formatDateTime(value: string | Date | null | undefined, timeZone
     timeZoneName: 'short',
     timeZone
   }).format(new Date(value))
-}
-
-export const ROLE_LABELS: Record<Role, string> = {
-  owner: 'Owner',
-  admin: 'Admin',
-  viewer: 'Viewer'
 }
 
 /** Up to two initials for an avatar, from a name or an email address */

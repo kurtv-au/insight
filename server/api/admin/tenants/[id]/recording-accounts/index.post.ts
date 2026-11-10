@@ -7,12 +7,13 @@ const bodySchema = z.object({
 
 // Connects an account number so its recordings appear in the tenant
 export default defineEventHandler(async (event) => {
-  await requirePlatformAdmin(event)
+  const admin = await requirePlatformAdmin(event)
   const tenantId = getRouterParam(event, 'id')!
   const { accountNumber } = await readValidatedBody(event, bodySchema.parse)
   const db = useDb()
 
-  if (!await db.query.tenants.findFirst({ where: eq(tables.tenants.id, tenantId) })) {
+  const tenant = await db.query.tenants.findFirst({ where: eq(tables.tenants.id, tenantId) })
+  if (!tenant) {
     throw createError({ statusCode: 404, message: 'Tenant not found' })
   }
 
@@ -30,5 +31,6 @@ export default defineEventHandler(async (event) => {
   }
 
   await db.insert(tables.tenantRecordingAccounts).values({ accountNumber, tenantId })
+  await recordAudit(admin, { action: 'recording_account.added', tenant, target: accountNumber })
   return { ok: true }
 })

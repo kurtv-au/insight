@@ -31,13 +31,15 @@ beforeEach(() => {
   body = { email: 'New.Admin@Example.com', name: 'New Admin' }
   params = { userId: 'user-2' }
   existing = undefined
-  target = { id: 'user-2', isPlatformAdmin: true }
+  target = { id: 'user-2', email: 'old.admin@example.com', isPlatformAdmin: true }
   writes = []
   mocks = {
     requirePlatformAdmin: vi.fn(async () => me),
     readValidatedBody: vi.fn(async (_event: unknown, parse: (b: unknown) => unknown) => parse(body)),
     findUserByEmail: vi.fn(async () => existing),
-    sendEmail: vi.fn(async () => undefined)
+    sendEmail: vi.fn(async () => undefined),
+    recordAudit: vi.fn(async () => undefined),
+    platformAdminDomains: vi.fn(() => ['example.com'])
   }
   vi.stubGlobal('defineEventHandler', (handler: Handler) => handler)
   vi.stubGlobal('getRouterParam', (_event: unknown, name: string) => params[name])
@@ -46,6 +48,8 @@ beforeEach(() => {
   vi.stubGlobal('normalizeEmail', (email: string) => email.trim().toLowerCase())
   vi.stubGlobal('appUrl', (path: string) => `https://insight.example${path}`)
   vi.stubGlobal('tables', schema)
+  vi.stubGlobal('emailDomainAllowed', (email: string, domains: string[]) => domains.includes(email.split('@')[1]!.toLowerCase()))
+  vi.stubGlobal('describeEmailDomains', (domains: string[]) => domains.map(domain => `@${domain}`).join(' or '))
   vi.stubGlobal('useDb', () => ({
     query: { users: { findFirst: async () => target } },
     insert: () => ({ values: async (values: unknown) => writes.push({ op: 'insert', values }) }),
@@ -127,10 +131,38 @@ describe('POST /api/admin/admins', () => {
   })
 })
 
+describe('POST /api/admin/admins: allowed domains', () => {
+  it('refuses an address outside the allowed domains, before writing anything', async () => {
+    body.email = 'someone@gmail.com'
+    await expect((await load(POST))({})).rejects.toMatchObject({ statusCode: 400, message: 'Platform admins need an @example.com address' })
+    expect(writes).toEqual([])
+    expect(mocks.sendEmail).not.toHaveBeenCalled()
+    expect(mocks.recordAudit).not.toHaveBeenCalled()
+  })
+
+  it('records who made them an admin', async () => {
+    await (await load(POST))({})
+    expect(mocks.recordAudit).toHaveBeenCalledWith(me, { action: 'admin.added', target: 'new.admin@example.com', details: { created: true } })
+  })
+})
+
+describe('GET /api/admin/admins', () => {
+  it('flags admins outside the allowed domains', async () => {
+    const rows = [{ id: 'a', email: 'kurt@example.com' }, { id: 'b', email: 'legacy@gmail.com' }]
+    const query = { from: () => query, where: () => query, orderBy: async () => rows }
+    vi.stubGlobal('useDb', () => ({ select: () => query }))
+    expect(await (await load(GET))({})).toEqual({
+      domains: ['example.com'],
+      admins: [{ ...rows[0], allowedDomain: true }, { ...rows[1], allowedDomain: false }]
+    })
+  })
+})
+
 describe('DELETE /api/admin/admins/:userId', () => {
-  it('takes away platform admin and nothing else', async () => {
+  it('takes away platform admin and nothing else, and records it', async () => {
     await (await load(DELETE))({})
     expect(writes).toEqual([{ op: 'update', values: { isPlatformAdmin: false } }])
+    expect(mocks.recordAudit).toHaveBeenCalledWith(me, { action: 'admin.removed', target: 'old.admin@example.com' })
   })
 
   it('refuses to remove yourself', async () => {

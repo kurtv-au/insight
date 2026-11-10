@@ -9,7 +9,7 @@ const bodySchema = z.object({
 
 // Account settings that owners and admins can change
 export default defineEventHandler(async (event) => {
-  const { tenant } = await requireTenantRole(event, getRouterParam(event, 'tenantId')!, 'admin')
+  const { user, tenant } = await requireTenantRole(event, getRouterParam(event, 'tenantId')!, 'admin')
   const body = await readValidatedBody(event, bodySchema.parse)
 
   const changes: Partial<typeof tables.tenants.$inferInsert> = {}
@@ -25,6 +25,10 @@ export default defineEventHandler(async (event) => {
   }
   if (Object.keys(changes).length) {
     await useDb().update(tables.tenants).set(changes).where(eq(tables.tenants.id, tenant.id))
+    const changed = auditChanges(tenant, changes)
+    if (Object.keys(changed).length) {
+      await recordAudit(user, { action: 'account.settings_changed', tenant, details: { changes: changed } })
+    }
   }
   return { ok: true }
 })

@@ -1,10 +1,12 @@
 import { asc, eq } from 'drizzle-orm'
 
-// Every platform admin, for /admin/admins
+// Every platform admin, for /admin/admins, flagging any made before the
+// domain rule whose address is outside it
 export default defineEventHandler(async (event) => {
   await requirePlatformAdmin(event)
+  const domains = platformAdminDomains()
 
-  return useDb()
+  const admins = await useDb()
     .select({
       id: tables.users.id,
       name: tables.users.name,
@@ -15,4 +17,8 @@ export default defineEventHandler(async (event) => {
     .from(tables.users)
     .where(eq(tables.users.isPlatformAdmin, true))
     .orderBy(asc(tables.users.name), asc(tables.users.email))
+  return {
+    domains,
+    admins: admins.map(admin => ({ ...admin, allowedDomain: emailDomainAllowed(admin.email, domains) }))
+  }
 })

@@ -25,5 +25,10 @@ export default defineEventHandler(async (event) => {
   if (ownerEmail) {
     await createInvitation({ tenant, email: ownerEmail, role: 'owner', invitedBy: admin })
   }
+  await recordAudit(admin, {
+    action: 'tenant.created',
+    tenant,
+    details: { slug, ...(ownerEmail && { invitedOwner: normalizeEmail(ownerEmail) }) }
+  })
   return { id, slug, invited: !!ownerEmail }
 })

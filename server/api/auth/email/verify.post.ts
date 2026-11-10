@@ -8,7 +8,7 @@ const bodySchema = z.union([
 
 export default defineEventHandler(async (event) => {
   const body = await readValidatedBody(event, bodySchema.parse)
-  await rateLimitAuth(event, 'email-verify', 'email' in body ? body.email : undefined)
+  rateLimitAuth(event, 'email-verify', 'email' in body ? body.email : undefined)
 
   let userId: string | null
   if ('token' in body) {

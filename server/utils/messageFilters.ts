@@ -129,8 +129,8 @@ export async function deleteMessageFilter(tenantId: string, filterId: string) {
 }
 
 /**
- * Replaces a member's filters. Every id must be one of the tenant's, and
- * together they must fit au-api's `match` limits.
+ * Replaces a member's filters, returning them. Every id must be one of the
+ * tenant's, and together they must fit au-api's `match` limits.
  */
 export async function setMemberMessageFilters(tenantId: string, userId: string, filterIds: string[]) {
   const db = useDb()
@@ -152,4 +152,5 @@ export async function setMemberMessageFilters(tenantId: string, userId: string, 
       await tx.insert(assigned).values(filterIds.map(filterId => ({ tenantId, userId, filterId })))
     }
   })
+  return rows
 }

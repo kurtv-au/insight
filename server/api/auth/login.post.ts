@@ -11,7 +11,7 @@ let dummyHash: Promise<string> | undefined
 
 export default defineEventHandler(async (event) => {
   const { email, password } = await readValidatedBody(event, bodySchema.parse)
-  await rateLimitAuth(event, 'login', email)
+  rateLimitAuth(event, 'login', email)
 
   const user = await findUserByEmail(email)
   dummyHash ??= hashPassword('dummy-password-for-timing')

@@ -34,7 +34,8 @@ const accountMenu = computed<DropdownMenuItem[][]>(() => [
     ...(user.value?.isPlatformAdmin
       ? [
           { label: 'Admin', icon: 'i-lucide-shield', to: '/admin/tenants' },
-          { label: 'Platform admins', icon: 'i-lucide-shield-check', to: '/admin/admins' }
+          { label: 'Platform admins', icon: 'i-lucide-shield-check', to: '/admin/admins' },
+          { label: 'Audit log', icon: 'i-lucide-scroll-text', to: '/admin/audit' }
         ]
       : []),
     {

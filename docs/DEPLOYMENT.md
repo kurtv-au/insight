@@ -421,7 +421,9 @@ grep -c '=$' /opt/insight/shared/.env          # 0: nothing left empty
 unset ADMIN_PW APP_PW AU_KEY DB_HOST
 ```
 
-`NUXT_PUBLIC_APP_URL` builds the links in emails. There are no AWS keys,
+`NUXT_PUBLIC_APP_URL` builds the links in emails. Optionally,
+`NUXT_PLATFORM_ADMIN_DOMAINS` (comma-separated, default `answerunited.com`)
+sets which email domains can be made platform admins. There are no AWS keys,
 because the instance role sends email. To change a value later, edit the file
 with `sudo vi` and see "Changing the environment" below.
 
@@ -452,6 +454,11 @@ broken sign-ins or 503s.
    ```
 
    The target group turns healthy within about 30 s.
+
+   nginx isn't part of a release: when `deploy/nginx/insight.conf` changes
+   (for example, the security headers added in 2.10.0), deploy that release,
+   then run the same `sed … | sudo tee` line followed by
+   `sudo nginx -t && sudo systemctl reload nginx`.
 4. **Re-run the release** (Actions → release → Re-run). From now on, every
    deploy also checks that `/login` loads through nginx.
 5. **The first admin.** In an SSM session:

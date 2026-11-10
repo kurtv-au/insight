@@ -4,7 +4,7 @@ import { supportEmail } from '../emails/support'
 export default defineEventHandler(async (event) => {
   const user = await requireUser(event)
   const body = await readValidatedBody(event, supportRequestSchema.parse)
-  await rateLimit(`support:user:${user.id}`, 5, 60 * 60)
+  rateLimit(`support:user:${user.id}`, 5, 60 * 60)
 
   // Checked directly rather than with requireTenantRole, so people can still ask
   // about an account that is being set up or is suspended

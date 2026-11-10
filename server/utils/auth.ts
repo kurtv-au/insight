@@ -90,3 +90,9 @@ declare module 'h3' {
     user?: DbUser
   }
 }
+
+/** The email domains platform admins must be at (runtime config, comma-separated) */
+export function platformAdminDomains() {
+  const domains = parseEmailDomains(useRuntimeConfig().platformAdminDomains)
+  return domains.length ? domains : parseEmailDomains(DEFAULT_PLATFORM_ADMIN_DOMAINS)
+}

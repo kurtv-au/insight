@@ -82,12 +82,12 @@ function filterActions(filter: Filter): DropdownMenuItem[] {
   <UCard>
     <div class="flex flex-wrap items-start justify-between gap-4">
       <p class="min-w-0 max-w-prose text-body-sm text-muted">
-        Assign filters to people on the
+        Assign filters to viewers on the
         <ULink
           :to="`/t/${tenantSlug}/members`"
           class="text-default underline"
         >Members page</ULink>
-        and they see only messages where one of their filters matches. People without filters see every message.
+        and they see only messages where one of their filters matches. People without filters, and every admin and owner, see every message.
       </p>
       <UButton
         label="Add filter"

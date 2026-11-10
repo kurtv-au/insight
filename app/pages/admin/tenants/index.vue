@@ -234,6 +234,15 @@ async function onInviteOwner(event: FormSubmitEvent<z.output<typeof inviteSchema
           <span class="hidden sm:inline">Platform admins</span>
         </UButton>
         <UButton
+          icon="i-lucide-scroll-text"
+          color="neutral"
+          variant="outline"
+          to="/admin/audit"
+          aria-label="Audit log"
+        >
+          <span class="hidden sm:inline">Audit log</span>
+        </UButton>
+        <UButton
           label="New account"
           icon="i-lucide-plus"
           @click="createOpen = true"

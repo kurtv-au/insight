@@ -11,14 +11,22 @@ const bodySchema = z.object({
 })
 
 export default defineEventHandler(async (event) => {
-  await requirePlatformAdmin(event)
+  const admin = await requirePlatformAdmin(event)
   const { recordingColumns, ...body } = await readValidatedBody(event, bodySchema.parse)
+  const db = useDb()
 
-  const [result] = await useDb().update(tables.tenants)
-    .set({ ...body, ...(recordingColumns && { recordingColumns: normalizeColumns(recordingColumns) }) })
-    .where(eq(tables.tenants.id, getRouterParam(event, 'id')!))
-  if (result.affectedRows === 0) {
+  const tenant = await db.query.tenants.findFirst({ where: eq(tables.tenants.id, getRouterParam(event, 'id')!) })
+  if (!tenant) {
     throw createError({ statusCode: 404, message: 'Tenant not found' })
+  }
+  const changes = { ...body, ...(recordingColumns && { recordingColumns: normalizeColumns(recordingColumns) }) }
+  if (Object.keys(changes).length) {
+    await db.update(tables.tenants).set(changes).where(eq(tables.tenants.id, tenant.id))
+  }
+
+  const changed = auditChanges(tenant, changes)
+  if (Object.keys(changed).length) {
+    await recordAudit(admin, { action: 'tenant.updated', tenant: { id: tenant.id, name: changes.name ?? tenant.name }, details: { changes: changed } })
   }
   return { ok: true }
 })

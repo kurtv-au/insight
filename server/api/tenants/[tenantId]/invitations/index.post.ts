@@ -9,6 +9,8 @@ const bodySchema = z.object({
 export default defineEventHandler(async (event) => {
   const { user, tenant, role: actorRole } = await requireTenantRole(event, getRouterParam(event, 'tenantId')!, 'admin')
   const { email, role } = await readValidatedBody(event, bodySchema.parse)
+  // Each invitation sends an email from Answer United's address
+  rateLimit(`invite:user:${user.id}`, 30, 60 * 60)
 
   if (role === 'owner' && actorRole !== 'owner') {
     throw createError({ statusCode: 403, message: 'Only owners can invite owners' })
@@ -25,5 +27,6 @@ export default defineEventHandler(async (event) => {
   }
 
   const id = await createInvitation({ tenant, email, role, invitedBy: user })
+  await recordAudit(user, { action: 'invitation.sent', tenant, target: normalizeEmail(email), details: { role } })
   return { id }
 })
