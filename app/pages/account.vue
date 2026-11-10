@@ -7,6 +7,14 @@ useSeoMeta({ title: 'Account' })
 const toast = useToast()
 const confirm = useConfirm()
 const { fetch: refreshSession } = useUserSession()
+const signOut = useSignOut()
+const colorMode = useColorMode()
+const isDark = computed({
+  get: () => colorMode.value === 'dark',
+  set: (dark: boolean) => {
+    colorMode.preference = dark ? 'dark' : 'light'
+  }
+})
 const { formatDate } = useTimezone()
 const { register, isSupported: passkeySupported } = useWebAuthn()
 
@@ -161,16 +169,17 @@ async function signOutOtherDevices() {
           class="space-y-4"
           @submit="onSaveProfile"
         >
-          <UFormField
-            label="Email"
-            help="Contact Answer United to change your email address."
-          >
-            <UInput
-              :model-value="me?.email"
-              disabled
-              class="w-full"
-            />
-          </UFormField>
+          <div>
+            <p class="text-sm font-medium text-default">
+              Email
+            </p>
+            <p class="mt-1 text-body text-highlighted break-all">
+              {{ me?.email }}
+            </p>
+            <p class="mt-1 text-body-sm text-muted">
+              Contact Answer United to change your email address.
+            </p>
+          </div>
           <UFormField
             label="Name"
             name="name"
@@ -395,6 +404,37 @@ async function signOutOtherDevices() {
             color="neutral"
             variant="outline"
             @click="signOutOtherDevices"
+          />
+        </div>
+      </UCard>
+    </section>
+
+    <section class="mt-10">
+      <SectionKicker
+        number="05"
+        label="This device"
+        class="mb-3"
+      />
+      <UCard :ui="{ body: 'divide-y divide-muted p-0 sm:p-0' }">
+        <div class="flex items-center justify-between gap-4 px-[26px] py-4">
+          <p class="text-body-sm text-default">
+            Dark mode
+          </p>
+          <USwitch
+            v-model="isDark"
+            aria-label="Dark mode"
+          />
+        </div>
+        <div class="flex flex-col items-start gap-3 px-[26px] py-4 sm:flex-row sm:items-center sm:justify-between">
+          <p class="text-body-sm text-muted">
+            Signed in as {{ me?.email }}.
+          </p>
+          <UButton
+            label="Sign out"
+            icon="i-lucide-log-out"
+            color="neutral"
+            variant="outline"
+            @click="signOut"
           />
         </div>
       </UCard>

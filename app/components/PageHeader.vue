@@ -15,7 +15,8 @@ withDefaults(defineProps<{
       :label="kicker"
       :hairline="false"
     />
-    <div class="mt-3 flex items-start justify-between gap-3">
+    <!-- On phones the actions go under the title, so they never cover it -->
+    <div class="mt-3 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
       <div class="min-w-0">
         <h1 class="text-[clamp(32px,3.2vw,46px)] leading-[1.04] text-highlighted">
           {{ title }}
@@ -24,7 +25,7 @@ withDefaults(defineProps<{
       </div>
       <div
         v-if="$slots.actions"
-        class="flex shrink-0 items-center gap-2"
+        class="flex shrink-0 flex-wrap items-center gap-2"
       >
         <slot name="actions" />
       </div>

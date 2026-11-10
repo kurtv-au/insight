@@ -4,7 +4,9 @@ export function useSignOut() {
   return async () => {
     await clear()
     clearNuxtData()
-    clearNuxtState('tenant-context')
+    // The last loaded message and recording lists are someone's own view
+    // (message filters), so they go with the session
+    clearNuxtState(key => key === 'tenant-context' || key.startsWith('messages-pages:') || key.startsWith('recordings-pages:'))
     await navigateTo('/login')
   }
 }

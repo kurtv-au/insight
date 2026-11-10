@@ -4,9 +4,12 @@ const { data: tenants } = await useMyTenants()
 
 const canOpen = (tenant: typeof tenants.value[number]) => canOpenTenant(tenant.status, user.value?.isPlatformAdmin)
 
-// Skip the picker when there's only one tenant to choose
+// Skip the picker when there's only one tenant to choose, straight to its
+// messages; platform admins who belong to none go to All accounts
 if (tenants.value.length === 1 && canOpen(tenants.value[0]!)) {
-  await navigateTo(`/t/${tenants.value[0]!.slug}`, { replace: true })
+  await navigateTo(`/t/${tenants.value[0]!.slug}/messages`, { replace: true })
+} else if (!tenants.value.length && user.value?.isPlatformAdmin) {
+  await navigateTo('/admin/tenants', { replace: true })
 }
 </script>
 
@@ -86,19 +89,8 @@ if (tenants.value.length === 1 && canOpen(tenants.value[0]!)) {
       class="mt-10 flex flex-col items-start gap-4"
     >
       <p class="max-w-[520px] text-body-sm text-muted">
-        {{ user?.isPlatformAdmin
-          ? 'You are not a member of any account. Manage all accounts from the admin area.'
-          : 'You are not a member of any account yet. Ask an account owner to invite you.' }}
+        You are not a member of any account yet. Ask an account owner to invite you.
       </p>
-      <AsideNote>Nothing here yet.</AsideNote>
-      <UButton
-        v-if="user?.isPlatformAdmin"
-        label="Manage accounts"
-        icon="i-lucide-building-2"
-        color="neutral"
-        variant="outline"
-        to="/admin/tenants"
-      />
     </section>
   </div>
 </template>

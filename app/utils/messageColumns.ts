@@ -23,7 +23,7 @@ export function buildMessageColumns(
     columns.push({
       id: 'createdAt',
       header: options.header ? () => options.header!(null, 'Received') : 'Received',
-      cell: ({ row }) => h('span', { class: 'whitespace-nowrap tabular-nums' }, formatDateTime(row.original.createdAt, options.timeZone))
+      cell: ({ row }) => h('span', { class: 'whitespace-nowrap tabular-nums' }, formatDateTime(row.original.createdAt, options.timeZone, { zone: false }))
     })
   }
 

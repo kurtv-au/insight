@@ -17,6 +17,6 @@ export function useTimezone() {
     timezone,
     label: computed(() => timezoneLabel(timezone.value)),
     formatDate: (value: string | Date | null | undefined) => formatDate(value, timezone.value),
-    formatDateTime: (value: string | Date | null | undefined) => formatDateTime(value, timezone.value)
+    formatDateTime: (value: string | Date | null | undefined, options?: { zone?: boolean }) => formatDateTime(value, timezone.value, options)
   }
 }
