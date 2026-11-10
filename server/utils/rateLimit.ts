@@ -5,20 +5,37 @@ interface Window {
   resetAt: number
 }
 
+const windows = new Map<string, Window>()
+let nextPrune = 0
+
+/** Drops expired windows now and then, so the map doesn't grow without bound */
+function prune(now: number) {
+  if (now < nextPrune) {
+    return
+  }
+  nextPrune = now + 60_000
+  for (const [key, entry] of windows) {
+    if (entry.resetAt <= now) {
+      windows.delete(key)
+    }
+  }
+}
+
 /**
  * Fixed-window rate limiter. Throws 429 once `limit` requests for `key` are made
  * within `windowSeconds`.
  *
- * Uses Nitro's in-memory storage, so limits are per server instance. Mount a shared
- * driver (e.g. Redis) at `rate-limit` when running more than one instance.
+ * Counts in memory and synchronously (no await between reading and writing the
+ * count), so requests sent in parallel can't all pass. Limits are per server
+ * instance: with more than one, move this to a shared store (e.g. Redis) with
+ * an atomic increment.
  */
-export async function rateLimit(key: string, limit: number, windowSeconds: number) {
-  const storage = useStorage<Window>('rate-limit')
-  const now = Date.now()
-  const entry = await storage.getItem(key)
+export function rateLimit(key: string, limit: number, windowSeconds: number, now = Date.now()) {
+  prune(now)
+  const entry = windows.get(key)
 
   if (!entry || entry.resetAt <= now) {
-    await storage.setItem(key, { count: 1, resetAt: now + windowSeconds * 1000 })
+    windows.set(key, { count: 1, resetAt: now + windowSeconds * 1000 })
     return
   }
 
@@ -29,14 +46,14 @@ export async function rateLimit(key: string, limit: number, windowSeconds: numbe
     })
   }
 
-  await storage.setItem(key, { count: entry.count + 1, resetAt: entry.resetAt })
+  entry.count++
 }
 
 /** Applies one limit per client IP and a tighter one per email address */
-export async function rateLimitAuth(event: H3Event, action: string, email?: string) {
+export function rateLimitAuth(event: H3Event, action: string, email?: string) {
   const ip = getRequestIP(event, { xForwardedFor: true }) || 'unknown'
-  await rateLimit(`${action}:ip:${ip}`, 30, 15 * 60)
+  rateLimit(`${action}:ip:${ip}`, 30, 15 * 60)
   if (email) {
-    await rateLimit(`${action}:email:${normalizeEmail(email)}`, 10, 15 * 60)
+    rateLimit(`${action}:email:${normalizeEmail(email)}`, 10, 15 * 60)
   }
 }

@@ -10,8 +10,10 @@ const { formatDateTime } = useTimezone()
 const toast = useToast()
 const confirm = useConfirm()
 
-const { data: admins, refresh } = await useFetch('/api/admin/admins', { default: () => [] })
+const { data, refresh } = await useFetch('/api/admin/admins', { default: () => ({ domains: [] as string[], admins: [] }) })
+const admins = computed(() => data.value.admins)
 type Admin = typeof admins.value[number]
+const domainsLabel = computed(() => describeEmailDomains(data.value.domains))
 
 function adminActions(admin: Admin): DropdownMenuItem[] {
   return [{
@@ -117,6 +119,18 @@ async function onAdd(event: FormSubmitEvent<z.output<typeof addSchema>>) {
                 variant="subtle"
                 size="sm"
               />
+              <UTooltip
+                v-if="!admin.allowedDomain"
+                :text="`New admins need an ${domainsLabel} address. This one was made before that rule, or the allowed domains changed.`"
+              >
+                <UBadge
+                  label="Outside allowed domains"
+                  color="warning"
+                  variant="subtle"
+                  size="sm"
+                  icon="i-lucide-triangle-alert"
+                />
+              </UTooltip>
             </p>
             <p class="mono-meta truncate">
               <template v-if="admin.name">
@@ -165,6 +179,7 @@ async function onAdd(event: FormSubmitEvent<z.output<typeof addSchema>>) {
           <UFormField
             label="Email"
             name="email"
+            :help="`Must be an ${domainsLabel} address.`"
           >
             <UInput
               v-model="addState.email"

@@ -17,5 +17,6 @@ export default defineEventHandler(async (event) => {
   }
 
   await useDb().update(tables.users).set({ isPlatformAdmin: false }).where(eq(tables.users.id, userId))
+  await recordAudit(admin, { action: 'admin.removed', target: target.email })
   return { ok: true }
 })

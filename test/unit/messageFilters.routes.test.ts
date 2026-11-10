@@ -29,7 +29,7 @@ beforeEach(() => {
   params = { tenantId: 'tenant-1', messageId: '42', filterId: 'f1', userId: 'user-2' }
   mocks = {
     requireTenantRole: vi.fn(async () => ({ user: { id: 'user-1', isPlatformAdmin: false }, tenant, role: 'admin' })),
-    requireFilterableMember: vi.fn(async () => ({ tenantId: 'tenant-1', targetUserId: 'user-2' })),
+    requireFilterableMember: vi.fn(async () => ({ tenantId: 'tenant-1', targetUserId: 'user-2', target: { role: 'viewer' }, actor: { id: 'user-1', email: 'admin@example.com' }, tenant })),
     readValidatedBody: vi.fn(async (_event: unknown, parse: (body: unknown) => unknown) => parse({ name: 'GL7112', fieldKey: 'GALLEY', value: 'GL7112', filterIds: [] })),
     getValidatedQuery: vi.fn(async (_event: unknown, parse: (query: unknown) => unknown) => parse({})),
     visibleMessageFields: vi.fn(async () => fields),
@@ -43,7 +43,9 @@ beforeEach(() => {
     validateMessageFilter: vi.fn(async (_tenantId: string, input: unknown) => input),
     requireMessageFilter: vi.fn(async () => ({ id: 'f1' })),
     deleteMessageFilter: vi.fn(async () => undefined),
-    setMemberMessageFilters: vi.fn(async () => undefined),
+    setMemberMessageFilters: vi.fn(async () => []),
+    recordAudit: vi.fn(async () => undefined),
+    memberEmail: vi.fn(async () => 'viewer@example.com'),
     insert: vi.fn(() => ({ values: async () => undefined })),
     update: vi.fn(() => ({ set: () => ({ where: async () => undefined }) }))
   }
@@ -62,6 +64,11 @@ beforeEach(() => {
   for (const [name, fn] of Object.entries(mocks)) {
     vi.stubGlobal(name, fn)
   }
+  vi.stubGlobal('assertFilterableRole', (role: string, filterIds: string[]) => {
+    if (filterIds.length && role !== 'viewer') {
+      throw new HttpError(400, 'Message filters apply to viewers. Make them a viewer first.')
+    }
+  })
 })
 
 afterEach(() => {
@@ -136,9 +143,40 @@ describe('message filter APIs', () => {
     expect(mocks.readValidatedBody).not.toHaveBeenCalled()
     expect(mocks.setMemberMessageFilters).not.toHaveBeenCalled()
 
-    mocks.requireFilterableMember!.mockResolvedValue({ tenantId: 'tenant-1', targetUserId: 'user-2' })
+    mocks.requireFilterableMember!.mockResolvedValue({ tenantId: 'tenant-1', targetUserId: 'user-2', target: { role: 'viewer' }, actor: { id: 'user-1' }, tenant })
     await (await load(PUT))({})
     expect(mocks.setMemberMessageFilters).toHaveBeenCalledWith('tenant-1', 'user-2', [])
+    expect(mocks.recordAudit).toHaveBeenCalledWith({ id: 'user-1' }, expect.objectContaining({
+      action: 'member.filters_changed',
+      target: 'viewer@example.com',
+      details: { filters: [] }
+    }))
+  })
+
+  it('PUT member filters refuses filters for an admin, but lets theirs be cleared', async () => {
+    const PUT = '../../server/api/tenants/[tenantId]/members/[userId]/message-filters.put'
+    mocks.requireFilterableMember!.mockResolvedValue({ tenantId: 'tenant-1', targetUserId: 'user-2', target: { role: 'admin' }, actor: { id: 'user-1' }, tenant })
+    mocks.readValidatedBody!.mockImplementation(async (_event: unknown, parse: (body: unknown) => unknown) => parse({ filterIds: ['f1'] }))
+    await expect((await load(PUT))({})).rejects.toMatchObject({ statusCode: 400 })
+    expect(mocks.setMemberMessageFilters).not.toHaveBeenCalled()
+
+    mocks.readValidatedBody!.mockImplementation(async (_event: unknown, parse: (body: unknown) => unknown) => parse({ filterIds: [] }))
+    await (await load(PUT))({})
+    expect(mocks.setMemberMessageFilters).toHaveBeenCalledWith('tenant-1', 'user-2', [])
+  })
+
+  it('records who changed a filter, before and after', async () => {
+    mocks.requireMessageFilter!.mockResolvedValue({ id: 'f1', name: 'Old', fieldKey: 'GALLEY', value: 'GL1' })
+    await (await load(routes['PATCH filter']))({})
+    expect(mocks.recordAudit).toHaveBeenCalledWith({ id: 'user-1', isPlatformAdmin: false }, {
+      action: 'filter.updated',
+      tenant,
+      target: 'GL7112',
+      details: {
+        before: { name: 'Old', fieldKey: 'GALLEY', value: 'GL1' },
+        after: { name: 'GL7112', fieldKey: 'GALLEY', value: 'GL7112' }
+      }
+    })
   })
 })
 

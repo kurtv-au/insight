@@ -35,6 +35,7 @@ useSeoMeta({ title: 'Privacy Policy' })
         <li>When you last signed in, which the owners and admins of your accounts can see.</li>
         <li>Sign-in links, codes and invitation links, stored only as hashes. Sign-in links and codes expire after 15 minutes.</li>
         <li>We briefly use your IP address and email address to limit repeated sign-in attempts. Our servers and hosting providers may also keep standard logs, such as IP address, browser type and the time and page requested, to run and secure Insight.</li>
+        <li>A record of changes to who can see what, such as invitations, role changes, message filters and account settings, with who made each change and when. Answer United uses it to secure Insight and answer questions about access.</li>
       </ul>
 
       <h3>Client content</h3>
@@ -53,7 +54,7 @@ useSeoMeta({ title: 'Privacy Policy' })
         Insight uses only what it needs to work:
       </p>
       <ul>
-        <li>an essential, encrypted session cookie that keeps you signed in; and</li>
+        <li>an essential, encrypted session cookie that keeps you signed in for up to 30 days; and</li>
         <li>your light or dark mode preference, saved in your browser.</li>
       </ul>
       <p>
@@ -86,7 +87,7 @@ useSeoMeta({ title: 'Privacy Policy' })
 
       <h2>6. Security</h2>
       <p>
-        Insight is served only over encrypted connections. Passwords and sign-in tokens are stored as hashes, and sessions are sealed so they cannot be read or altered. Changing or resetting your password signs you out on your other devices, and you can sign out other devices yourself from your Account page. No system is perfectly secure, so please tell us right away if you suspect unauthorized access.
+        Insight is served only over encrypted connections. Passwords and sign-in tokens are stored as hashes, and sessions are sealed so they cannot be read or altered and end after 30 days. Changing or resetting your password signs you out on your other devices, and you can sign out other devices yourself from your Account page. No system is perfectly secure, so please tell us right away if you suspect unauthorized access.
       </p>
 
       <h2>7. Your choices</h2>

@@ -236,6 +236,26 @@ export const webauthnChallenges = mysqlTable('webauthn_challenges', {
   expiresAt: datetime('expires_at').notNull()
 })
 
+// Who changed access or setup, and when (server/utils/audit.ts). No foreign
+// keys: names are copied in, so the history outlives a deleted account.
+export const auditEvents = mysqlTable('audit_events', {
+  id: id(),
+  // To the millisecond, so events from one request or second keep their order
+  createdAt: datetime('created_at', { fsp: 3 }).notNull().$defaultFn(() => new Date()),
+  actorUserId: varchar('actor_user_id', { length: 36 }),
+  actorEmail: varchar('actor_email', { length: 255 }).notNull(),
+  // e.g. member.role_changed (shared/utils/audit.ts)
+  action: varchar('action', { length: 64 }).notNull(),
+  tenantId: varchar('tenant_id', { length: 36 }),
+  tenantName: varchar('tenant_name', { length: 255 }),
+  // The person, filter or account number affected, as it was named then
+  targetLabel: varchar('target_label', { length: 255 }),
+  details: json('details').$type<Record<string, unknown>>()
+}, table => [
+  index('audit_events_created_at_idx').on(table.createdAt),
+  index('audit_events_tenant_id_created_at_idx').on(table.tenantId, table.createdAt)
+])
+
 export const tenantsRelations = relations(tenants, ({ many }) => ({
   memberships: many(memberships),
   invitations: many(invitations),

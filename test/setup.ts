@@ -11,7 +11,8 @@ const independent = await Promise.all([
   import('../shared/utils/recordings'),
   import('../shared/utils/support'),
   import('../shared/utils/messageFieldTypes'),
-  import('../shared/utils/csv')
+  import('../shared/utils/csv'),
+  import('../shared/utils/platformAdmins')
 ])
 for (const mod of independent) {
   Object.assign(globalThis, mod)
@@ -19,3 +20,4 @@ for (const mod of independent) {
 Object.assign(globalThis, await import('../shared/utils/schemas'))
 Object.assign(globalThis, await import('../shared/utils/messageFields'))
 Object.assign(globalThis, await import('../shared/utils/messageFilters'))
+Object.assign(globalThis, await import('../shared/utils/audit'))

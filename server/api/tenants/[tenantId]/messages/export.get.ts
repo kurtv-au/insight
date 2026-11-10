@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
   const tenantId = getRouterParam(event, 'tenantId')!
   const { user, tenant } = await requireTenantRole(event, tenantId, 'viewer')
   const query = await getValidatedQuery(event, querySchema.parse)
-  await rateLimit(`messages-export:${user.id}`, 30, 60 * 60)
+  rateLimit(`messages-export:${user.id}`, 30, 60 * 60)
 
   const timeZone = query.tz ?? tenant.timezone
   const [fields, receivedSetting] = await Promise.all([visibleMessageFields(tenantId), messageReceivedSetting(tenantId)])

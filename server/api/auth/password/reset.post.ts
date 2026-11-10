@@ -8,7 +8,7 @@ const bodySchema = z.object({
 
 export default defineEventHandler(async (event) => {
   const { token, password } = await readValidatedBody(event, bodySchema.parse)
-  await rateLimitAuth(event, 'password-reset')
+  rateLimitAuth(event, 'password-reset')
 
   const userId = await consumeEmailLinkToken(token, 'password_reset')
   if (!userId) {

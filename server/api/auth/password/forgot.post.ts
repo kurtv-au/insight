@@ -7,7 +7,7 @@ const bodySchema = z.object({
 
 export default defineEventHandler(async (event) => {
   const { email } = await readValidatedBody(event, bodySchema.parse)
-  await rateLimitAuth(event, 'password-forgot', email)
+  rateLimitAuth(event, 'password-forgot', email)
 
   const user = await findUserByEmail(email)
   if (user && !user.disabledAt) {

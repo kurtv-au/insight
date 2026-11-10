@@ -9,7 +9,7 @@ export default defineWebAuthnAuthenticateEventHandler({
   storeChallenge: storeWebAuthnChallenge,
   getChallenge: getWebAuthnChallenge,
   async getCredential(event, credentialId) {
-    await rateLimitAuth(event, 'passkey')
+    rateLimitAuth(event, 'passkey')
     const passkey = await useDb().query.passkeys.findFirst({ where: eq(tables.passkeys.id, credentialId) })
     if (!passkey) {
       throw createError({ statusCode: 400, message: 'This passkey is not registered with Insight.' })

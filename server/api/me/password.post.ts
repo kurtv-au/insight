@@ -10,7 +10,7 @@ const bodySchema = z.object({
 export default defineEventHandler(async (event) => {
   const user = await requireUser(event)
   const { currentPassword, newPassword } = await readValidatedBody(event, bodySchema.parse)
-  await rateLimitAuth(event, 'password-change', user.email)
+  rateLimitAuth(event, 'password-change', user.email)
 
   if (user.passwordHash && !(currentPassword && await verifyPassword(user.passwordHash, currentPassword))) {
     throw createError({ statusCode: 400, message: 'Current password is incorrect' })

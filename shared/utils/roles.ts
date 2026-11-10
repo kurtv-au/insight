@@ -1,6 +1,12 @@
 export const ROLES = ['owner', 'admin', 'viewer'] as const
 export type Role = typeof ROLES[number]
 
+export const ROLE_LABELS: Record<Role, string> = {
+  owner: 'Owner',
+  admin: 'Admin',
+  viewer: 'Viewer'
+}
+
 const ROLE_RANK: Record<Role, number> = {
   owner: 3,
   admin: 2,

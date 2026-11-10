@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, isNull, lt, sql } from 'drizzle-orm'
 
 type Purpose = 'login' | 'password_reset'
 
@@ -69,14 +69,16 @@ export async function consumeLoginCode(userId: string, code: string) {
     ),
     orderBy: desc(tables.emailTokens.createdAt)
   })
-  if (!row?.codeHash || row.attempts >= MAX_CODE_ATTEMPTS) {
+  if (!row?.codeHash) {
     return null
   }
 
-  if (!safeEqual(row.codeHash, hashToken(code))) {
-    await db.update(tables.emailTokens)
-      .set({ attempts: sql`${tables.emailTokens.attempts} + 1` })
-      .where(eq(tables.emailTokens.id, row.id))
+  // Every guess takes an attempt before it's checked, in one statement, so
+  // guesses sent in parallel can't all slip under the limit
+  const [counted] = await db.update(tables.emailTokens)
+    .set({ attempts: sql`${tables.emailTokens.attempts} + 1` })
+    .where(and(eq(tables.emailTokens.id, row.id), lt(tables.emailTokens.attempts, MAX_CODE_ATTEMPTS)))
+  if (counted.affectedRows !== 1 || !safeEqual(row.codeHash, hashToken(code))) {
     return null
   }
 

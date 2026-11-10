@@ -17,6 +17,10 @@ export default defineEventHandler(async (event) => {
   const admin = await requirePlatformAdmin(event)
   const { email, name, notify } = await readValidatedBody(event, bodySchema.parse)
   const normalized = normalizeEmail(email)
+  const domains = platformAdminDomains()
+  if (!emailDomainAllowed(normalized, domains)) {
+    throw createError({ statusCode: 400, message: `Platform admins need an ${describeEmailDomains(domains)} address` })
+  }
 
   const existing = await findUserByEmail(normalized)
   if (existing?.isPlatformAdmin) {
@@ -37,6 +41,8 @@ export default defineEventHandler(async (event) => {
     id = crypto.randomUUID()
     await useDb().insert(tables.users).values({ id, email: normalized, name: name ?? '', isPlatformAdmin: true })
   }
+
+  await recordAudit(admin, { action: 'admin.added', target: normalized, details: { created: !existing } })
 
   // They're an admin either way; a failed email is reported, not undone
   let emailed = false

@@ -38,7 +38,8 @@ beforeEach(() => {
     getValidatedQuery: vi.fn(async (_event: unknown, parse: (query: unknown) => unknown) => parse({})),
     adminMessageConfig: vi.fn(async () => ({ accountNumbers: ['1042'], settings: { scriptAccountNumber: '1042' }, fields: [] })),
     getActiveScript: vi.fn(async () => ({ status: 'ok', script })),
-    saveMessageFieldConfig: vi.fn(async () => undefined)
+    saveMessageFieldConfig: vi.fn(async () => undefined),
+    recordAudit: vi.fn(async () => undefined)
   }
   vi.stubGlobal('defineEventHandler', (handler: Handler) => handler)
   vi.stubGlobal('getRouterParam', () => 'tenant-1')

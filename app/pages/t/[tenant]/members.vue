@@ -37,9 +37,13 @@ function filterNames(member: Member) {
     .filter((name): name is string => !!name)
     .sort((a, b) => a.localeCompare(b))
 }
-// Someone else has to change your filters, unless you're a platform admin
+// Someone else has to change your filters, unless you're a platform admin.
+// Only viewers can have filters; anyone else is offered them only to clear any
+// left over from before that rule.
 function canFilter(member: Member) {
-  return canManage(member) && (member.userId !== user.value?.id || !!user.value?.isPlatformAdmin)
+  return canManage(member)
+    && (member.userId !== user.value?.id || !!user.value?.isPlatformAdmin)
+    && (member.role === 'viewer' || member.filterIds.length > 0)
 }
 const fieldLabels = computed(() => new Map(filterData.value.fields.map(field => [canonicalFieldKey(field.fieldKey), field.label])))
 const filterItems = computed(() => filterData.value.filters.map(filter => ({
@@ -95,6 +99,13 @@ function canManage(member: Member) {
 const roleItems = computed(() => ROLES
   .filter(role => role !== 'owner' || myRole.value === 'owner')
   .map(role => ({ label: ROLE_LABELS[role], value: role })))
+// A filtered member stays a viewer: admins and owners manage filters, so a
+// filter wouldn't hold them
+function memberRoleItems(member: Member) {
+  return member.filterIds.length
+    ? roleItems.value.map(item => ({ ...item, disabled: item.value !== 'viewer' }))
+    : roleItems.value
+}
 
 async function changeRole(member: Member, role: Role) {
   if (role === member.role) {
@@ -264,7 +275,7 @@ async function onInvite(event: FormSubmitEvent<z.output<typeof inviteSchema>>) {
             <USelect
               v-if="canManage(member)"
               :model-value="member.role"
-              :items="roleItems"
+              :items="memberRoleItems(member)"
               variant="outline"
               size="sm"
               class="w-24 sm:w-28"
@@ -350,6 +361,12 @@ async function onInvite(event: FormSubmitEvent<z.output<typeof inviteSchema>>) {
       description="They see only messages where one of these filters matches. With none, they see every message."
     >
       <template #body>
+        <AsideNote
+          v-if="filtersMember && filtersMember.role !== 'viewer'"
+          class="mb-4"
+        >
+          Message filters apply only to viewers. Remove these, or make {{ filtersMember.name || filtersMember.email }} a viewer to keep them.
+        </AsideNote>
         <USelectMenu
           v-if="filterItems.length"
           v-model="chosenFilters"

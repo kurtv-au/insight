@@ -64,6 +64,13 @@
       "when": 1794239461171,
       "tag": "0008_message_filters",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1794273503360,
+      "tag": "0009_audit_events",
+      "breakpoints": true
     }
   ]
 }
