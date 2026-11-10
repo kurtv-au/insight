@@ -94,7 +94,7 @@ Commit generated migrations along with the schema change.
 | Admin | Also invite, remove and change the roles of admins and viewers, and manage message filters |
 | Owner | Also manage other owners. Every tenant keeps at least one owner |
 
-Answer United staff are **platform admins**. They create tenants and can access every tenant as an owner. There is no self-signup; users join by invitation.
+Answer United staff are **platform admins**. They create tenants and can access every tenant as an owner. Platform admins add and remove each other at `/admin/admins` (linked from All accounts and the account menu): adding an email promotes that user, or creates one with no password who signs in by emailed link, and optionally emails them how. Nobody removes themselves, so one admin always remains. `pnpm admin:create` is only for the very first admin. There is no self-signup; users join by invitation.
 
 **Tenant status.** A new tenant starts in **Setting up** while Answer United configures it. Inviting the owner is optional at creation and can be done later from the admin page. During setup, invitations can be sent and accepted, but only platform admins can open the tenant. **Go live** (from the admin page or the banner inside the tenant) makes it **Active**. Active tenants can be suspended and reactivated. The rule lives in `canOpenTenant()` (`shared/utils/tenants.ts`). Platform admins can also rename a tenant (its slug stays) or delete it from the admin page; deleting asks for the slug to be typed, and removes the tenant with its memberships, invitations, settings, message filters and recording account numbers, while users and the recordings in au-api are kept.
 

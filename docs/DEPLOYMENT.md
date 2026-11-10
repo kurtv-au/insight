@@ -582,8 +582,8 @@ What it does:
   its recordings client number. If it has no client number, its v1 account
   number is used.
 - An account whose client numbers are a range (Answer United's
-  `1-9999999999`) is skipped with its users. Make staff platform admins with
-  `admin:create` instead.
+  `1-9999999999`) is skipped with its users. Make staff platform admins from
+  **Platform admins** (`/admin/admins`) instead.
 - Each user becomes a **viewer** of their account, with no password. They
   sign in with "Email me a sign-in link".
 - No email is sent. Owners are assigned afterwards from each tenant's members
