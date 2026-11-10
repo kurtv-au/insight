@@ -144,19 +144,72 @@ const apiQuery = computed(() => ({
 
 // au-api can take several seconds over a busy week, so the page opens straight
 // away and the list loads in the browser afterwards, with a loader meanwhile
-const { data: results, status, error: loadError, refresh } = useFetch(api, {
+const { data: fetched, status, error: loadError, refresh } = useFetch(api, {
   query: apiQuery,
   lazy: true,
   server: false,
   immediate: !!config.value?.configured,
   default: () => ({ items: [] as MessageRow[], total: 0, mock: false })
 })
+
+interface MessagePage { items: MessageRow[], total: number, mock: boolean }
+// What the list shows is the last page that loaded. It stays (dimmed) while
+// another loads, and the last few are kept for the visit, so coming back to
+// Messages shows them at once and refreshes behind them.
+const CACHED_PAGES = 8
+// Per person as well as per account: what a person sees depends on their message filters
+const { user: cacheUser } = useUserSession()
+const pageCache = useState<Record<string, MessagePage>>(`messages-pages:${cacheUser.value?.id}:${tenantId}`, () => ({}))
+const cacheKey = computed(() => JSON.stringify(apiQuery.value))
+const shownPage = ref<MessagePage | null>(pageCache.value[cacheKey.value] ?? null)
+watch(cacheKey, (key) => {
+  const cached = pageCache.value[key]
+  if (cached) {
+    shownPage.value = cached
+  }
+})
+// A refresh behind the shown list (returning to the page, or the automatic
+// one) doesn't dim it, and messages it brings in are briefly highlighted
+const quiet = ref(!!shownPage.value)
+const lastUpdated = ref<number | null>(null)
+const freshIds = ref(new Set<string>())
+let freshTimer: ReturnType<typeof setTimeout> | undefined
+watch(status, (value) => {
+  if (value === 'error') {
+    quiet.value = false
+  }
+  if (value !== 'success') {
+    return
+  }
+  const page = fetched.value
+  if (quiet.value && shownPage.value && cacheKey.value in pageCache.value) {
+    const before = new Set(shownPage.value.items.map(message => message.id))
+    const added = page.items.filter(message => !before.has(message.id)).map(message => message.id)
+    if (added.length) {
+      freshIds.value = new Set(added)
+      clearTimeout(freshTimer)
+      freshTimer = setTimeout(() => {
+        freshIds.value = new Set()
+      }, 8000)
+    }
+  }
+  shownPage.value = page
+  const kept = Object.entries(pageCache.value).filter(([key]) => key !== cacheKey.value).slice(-(CACHED_PAGES - 1))
+  pageCache.value = { ...Object.fromEntries(kept), [cacheKey.value]: page }
+  lastUpdated.value = Date.now()
+  quiet.value = false
+})
+const results = computed<MessagePage>(() => shownPage.value ?? { items: [], total: 0, mock: false })
 // 'idle' is the server render and the moment before the browser's first request
-const loading = computed(() => !!config.value?.configured && (status.value === 'pending' || status.value === 'idle'))
+const fetching = computed(() => !!config.value?.configured && (status.value === 'pending' || status.value === 'idle'))
+// Nothing to show yet: the full loader
+const loading = computed(() => fetching.value && !shownPage.value)
+// Something shown, and a new list on its way
+const updating = computed(() => fetching.value && !!shownPage.value && !quiet.value)
 
 // Export: every message matching the filters, across all pages, as CSV
 const exporting = ref(false)
-const canExport = computed(() => !!config.value?.configured && !loading.value && !loadError.value && results.value.total > 0)
+const canExport = computed(() => !!config.value?.configured && !fetching.value && !loadError.value && results.value.total > 0)
 
 async function exportCsv() {
   if (!canExport.value || exporting.value) {
@@ -294,8 +347,8 @@ const columnMenu = computed<DropdownMenuItem[][]>(() => [
 const tableMeta = {
   class: {
     tr: (row: { original: MessageRow }) => [
-      'cursor-pointer transition-colors hover:bg-elevated/60',
-      row.original.id === selectedId.value && 'bg-elevated'
+      'cursor-pointer transition-colors duration-700 hover:bg-elevated/60',
+      row.original.id === selectedId.value ? 'bg-elevated' : freshIds.value.has(row.original.id) && 'bg-cobalt-bg'
     ].filter(Boolean).join(' ')
   }
 }
@@ -310,7 +363,7 @@ watch(() => results.value.items[selectedIndex.value], (message) => {
   }
 })
 // Waits for the list, which usually has it
-watch([selectedId, selectedIndex, loading], async ([id, index, listLoading]) => {
+watch([selectedId, selectedIndex, fetching], async ([id, index, listLoading]) => {
   if (id && index === -1 && !listLoading && linkedMessage.value?.id !== id && config.value?.configured) {
     try {
       linkedMessage.value = await requestFetch<MessageRow>(`${api}/${encodeURIComponent(id)}`)
@@ -349,6 +402,60 @@ function changePage(page: number) {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 }
+
+// Today's messages keep coming in: while the page is open and visible, on the
+// first page of a range that includes today, the list refreshes every minute
+const REFRESH_MS = 60_000
+const now = ref(Date.now())
+const watchesToday = computed(() => !!config.value?.configured && filters.value.page === 1 && filters.value.to.compare(todayDate.value) >= 0)
+async function refreshList({ quietly = false } = {}) {
+  if (fetching.value || exporting.value) {
+    return
+  }
+  quiet.value = quietly
+  await refresh()
+}
+function refreshIfStale() {
+  now.value = Date.now()
+  if (watchesToday.value && document.visibilityState === 'visible' && lastUpdated.value && now.value - lastUpdated.value >= REFRESH_MS) {
+    refreshList({ quietly: true })
+  }
+}
+let refreshTimer: ReturnType<typeof setInterval> | undefined
+onMounted(() => {
+  refreshTimer = setInterval(refreshIfStale, 15_000)
+  document.addEventListener('visibilitychange', refreshIfStale)
+})
+onBeforeUnmount(() => {
+  clearInterval(refreshTimer)
+  clearTimeout(freshTimer)
+  document.removeEventListener('visibilitychange', refreshIfStale)
+})
+const updatedAgo = computed(() => {
+  if (!lastUpdated.value) {
+    return ''
+  }
+  const minutes = Math.floor((now.value - lastUpdated.value) / 60_000)
+  return minutes < 1 ? 'updated just now' : `updated ${minutes} min ago`
+})
+
+// Phones have no column headers, so sorting is a menu of the shown columns
+const cardColumns = computed(() => resolveMessageColumns(fields.value, columns.value))
+// Without a Received column, the default order (when messages were taken) reads as "Newest first"
+const defaultSortLabel = computed(() => received.value
+  ? 'Received'
+  : sort.value.fieldKey === null && sort.value.direction === 'asc' ? 'Oldest first' : 'Newest first')
+const sortLabel = computed(() => sort.value.fieldKey === null
+  ? defaultSortLabel.value
+  : fields.value.find(field => field.fieldKey === sort.value.fieldKey)?.label ?? defaultSortLabel.value)
+const sortMenu = computed<DropdownMenuItem[][]>(() => [[
+  { key: null as string | null, label: defaultSortLabel.value },
+  ...cardColumns.value.map(field => ({ key: field.fieldKey as string | null, label: field.label }))
+].map(option => ({
+  label: option.label,
+  icon: sort.value.fieldKey === option.key ? SORT_ICONS[sort.value.direction] : undefined,
+  onSelect: () => sortBy(option.key)
+}))])
 
 const emptyText = computed(() => {
   if (filters.value.q) {
@@ -441,6 +548,19 @@ const rangeNote = computed(() => `Messages go back ${historyDays.value} ${histor
             @change="setDates"
           />
 
+          <UDropdownMenu
+            :items="sortMenu"
+            class="sm:hidden"
+          >
+            <UButton
+              :label="`Sort: ${sortLabel}`"
+              :trailing-icon="sort.fieldKey === null && !received ? undefined : SORT_ICONS[sort.direction]"
+              color="neutral"
+              variant="outline"
+              class="sm:hidden"
+            />
+          </UDropdownMenu>
+
           <UButton
             v-if="hasFilters"
             label="Clear filters"
@@ -462,29 +582,44 @@ const rangeNote = computed(() => `Messages go back ${historyDays.value} ${histor
           :actions="[{ label: 'Try again', color: 'neutral', variant: 'outline', icon: 'i-lucide-refresh-cw', onClick: () => refresh() }]"
         />
 
-        <p
+        <div
           v-else
-          class="mono-meta mt-6"
+          class="mt-6 flex min-h-6 flex-wrap items-center gap-x-1.5"
         >
-          <template v-if="loading">
-            Loading messages…
-          </template><template v-else>
-            {{ results.total.toLocaleString('en-US') }} {{ results.total === 1 ? 'message' : 'messages' }}
-          </template><template v-if="!loading && pageCount > 1">
-            · page {{ filters.page }} of {{ pageCount }}
-          </template><template v-if="myFilters.names.length">
-            · <span :title="myFilters.title">only {{ myFilters.summary }}</span>
-          </template><template v-if="results.mock">
-            · sample data
-          </template>
-        </p>
+          <p
+            v-if="!loading"
+            class="mono-meta"
+          >
+            {{ results.total.toLocaleString('en-US') }} {{ results.total === 1 ? 'message' : 'messages' }}<template v-if="pageCount > 1">
+              · page {{ filters.page }} of {{ pageCount }}
+            </template><template v-if="myFilters.names.length">
+              · <span :title="myFilters.title">only {{ myFilters.summary }}</span>
+            </template><template v-if="results.mock">
+              · sample data
+            </template><template v-if="updatedAgo && watchesToday">
+              · {{ updatedAgo }}
+            </template>
+          </p>
+          <UButton
+            v-if="!loading"
+            icon="i-lucide-refresh-cw"
+            color="neutral"
+            variant="ghost"
+            size="xs"
+            :loading="fetching"
+            aria-label="Refresh messages"
+            @click="refreshList()"
+          />
+        </div>
 
         <UCard
-          class="mt-3"
+          class="mt-3 transition-opacity"
+          :class="updating && 'opacity-60'"
           :ui="{ body: 'p-0 sm:p-0' }"
         >
           <UTable
-            :data="results.items"
+            class="hidden sm:block"
+            :data="loadError ? [] : results.items"
             :columns="tableColumns"
             :meta="tableMeta"
             :ui="{ th: 'whitespace-nowrap' }"
@@ -497,6 +632,35 @@ const rangeNote = computed(() => `Messages go back ${historyDays.value} ${histor
               <TableLoading label="Loading messages…" />
             </template>
           </UTable>
+
+          <!-- Phones: one card per message instead of a table too wide to read -->
+          <div class="sm:hidden">
+            <TableLoading
+              v-if="loading"
+              label="Loading messages…"
+            />
+            <p
+              v-else-if="loadError || !results.items.length"
+              class="px-4 py-10 text-center text-body-sm text-muted"
+            >
+              {{ loadError ? 'Messages couldn’t be loaded.' : emptyText }}
+            </p>
+            <div
+              v-else
+              class="divide-y divide-muted"
+            >
+              <MessageCard
+                v-for="message in results.items"
+                :key="message.id"
+                :message="message"
+                :columns="cardColumns"
+                :received="received"
+                :selected="message.id === selectedId"
+                :fresh="freshIds.has(message.id)"
+                @open="openMessage(message)"
+              />
+            </div>
+          </div>
         </UCard>
 
         <div

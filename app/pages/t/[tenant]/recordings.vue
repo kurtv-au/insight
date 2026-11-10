@@ -113,15 +113,50 @@ const apiQuery = computed(() => ({
 
 // au-api can be slow, so the page opens straight away and the list loads in
 // the browser afterwards, with a loader meanwhile (as on the messages page)
-const { data: results, status, error: loadError, refresh } = useFetch(api, {
+const { data: fetched, status, error: loadError, refresh } = useFetch(api, {
   query: apiQuery,
   lazy: true,
   server: false,
   immediate: !!config.value?.hasAccountNumbers,
   default: () => ({ items: [] as RecordingDto[], total: 0 })
 })
+
+interface RecordingPage { items: RecordingDto[], total: number }
+// What the list shows is the last page that loaded. It stays (dimmed) while
+// another loads, and the last few are kept for the visit, so coming back to
+// Recordings shows them at once and refreshes behind them.
+const CACHED_PAGES = 8
+// Per person as well as per account: what a person sees depends on their message filters
+const { user: cacheUser } = useUserSession()
+const pageCache = useState<Record<string, RecordingPage>>(`recordings-pages:${cacheUser.value?.id}:${tenantId}`, () => ({}))
+const cacheKey = computed(() => JSON.stringify(apiQuery.value))
+const shownPage = ref<RecordingPage | null>(pageCache.value[cacheKey.value] ?? null)
+const quiet = ref(!!shownPage.value)
+watch(cacheKey, (key) => {
+  const cached = pageCache.value[key]
+  if (cached) {
+    shownPage.value = cached
+  }
+})
+watch(status, (value) => {
+  if (value === 'error') {
+    quiet.value = false
+  }
+  if (value !== 'success') {
+    return
+  }
+  shownPage.value = fetched.value
+  const kept = Object.entries(pageCache.value).filter(([key]) => key !== cacheKey.value).slice(-(CACHED_PAGES - 1))
+  pageCache.value = { ...Object.fromEntries(kept), [cacheKey.value]: fetched.value }
+  quiet.value = false
+})
+const results = computed<RecordingPage>(() => shownPage.value ?? { items: [], total: 0 })
 // 'idle' is the server render and the moment before the browser's first request
-const loading = computed(() => !!config.value?.hasAccountNumbers && (status.value === 'pending' || status.value === 'idle'))
+const fetching = computed(() => !!config.value?.hasAccountNumbers && (status.value === 'pending' || status.value === 'idle'))
+// Nothing to show yet: the full loader
+const loading = computed(() => fetching.value && !shownPage.value)
+// Something shown, and a new list on its way
+const updating = computed(() => fetching.value && !!shownPage.value && !quiet.value)
 const pageCount = computed(() => Math.max(1, Math.ceil(results.value.total / PAGE_SIZE)))
 
 // Search, debounced so each keystroke doesn't add a request or history entry
@@ -228,7 +263,7 @@ const COLUMN_DEFS: Record<RecordingColumn, TableColumn<RecordingDto>> = {
       row.original.id === selectedId.value
         ? h(UIcon, { 'name': 'i-lucide-audio-lines', 'class': 'size-4 shrink-0 animate-pulse text-primary', 'aria-label': 'Now playing' })
         : h(UIcon, { 'name': 'i-lucide-play', 'class': 'size-4 shrink-0 text-dimmed', 'aria-hidden': 'true' }),
-      formatDateTime(row.original.startedAt)
+      formatDateTime(row.original.startedAt, { zone: false })
     ])
   },
   ani: {
@@ -269,7 +304,7 @@ watch(() => results.value.items[selectedIndex.value], (recording) => {
   }
 })
 // Waits for the list, which usually has it
-watch([selectedId, selectedIndex, loading], async ([id, index, listLoading]) => {
+watch([selectedId, selectedIndex, fetching], async ([id, index, listLoading]) => {
   if (id && index === -1 && !listLoading && linkedRecording.value?.id !== id) {
     try {
       linkedRecording.value = await requestFetch<RecordingDto>(`${api}/${encodeURIComponent(id)}`)
@@ -301,6 +336,13 @@ function step(offset: number) {
     openRecording(next)
   }
 }
+
+// Phones have no column headers, so sorting is a menu of the shown columns
+const sortMenu = computed<DropdownMenuItem[][]>(() => [columns.value.map(column => ({
+  label: RECORDING_COLUMN_LABELS[column],
+  icon: sort.value.by === column ? SORT_ICONS[sort.value.direction] : undefined,
+  onSelect: () => sortBy(column)
+}))])
 
 function changePage(page: number) {
   updateQuery({ page, r: undefined }, { keepPage: true })
@@ -384,6 +426,19 @@ function changePage(page: number) {
           @update:model-value="updateQuery({ acct: $event === ALL_ACCOUNTS ? undefined : $event })"
         />
 
+        <UDropdownMenu
+          :items="sortMenu"
+          class="sm:hidden"
+        >
+          <UButton
+            :label="`Sort: ${RECORDING_COLUMN_LABELS[sort.by]}`"
+            :trailing-icon="SORT_ICONS[sort.direction]"
+            color="neutral"
+            variant="outline"
+            class="sm:hidden"
+          />
+        </UDropdownMenu>
+
         <UButton
           v-if="hasFilters"
           label="Clear filters"
@@ -407,11 +462,9 @@ function changePage(page: number) {
 
       <p
         v-else
-        class="mono-meta mt-6"
+        class="mono-meta mt-6 min-h-5"
       >
-        <template v-if="loading">
-          Loading recordings…
-        </template><template v-else>
+        <template v-if="!loading">
           {{ results.total.toLocaleString('en-US') }} {{ results.total === 1 ? 'recording' : 'recordings' }}
         </template><template v-if="!loading && pageCount > 1">
           · page {{ filters.page }} of {{ pageCount }}
@@ -419,11 +472,13 @@ function changePage(page: number) {
       </p>
 
       <UCard
-        class="mt-3"
+        class="mt-3 transition-opacity"
+        :class="updating && 'opacity-60'"
         :ui="{ body: 'p-0 sm:p-0' }"
       >
         <UTable
-          :data="results.items"
+          class="hidden sm:block"
+          :data="loadError ? [] : results.items"
           :columns="tableColumns"
           :meta="tableMeta"
           :loading="loading"
@@ -435,6 +490,33 @@ function changePage(page: number) {
             <TableLoading label="Loading recordings…" />
           </template>
         </UTable>
+
+        <!-- Phones: one card per call instead of a table too wide to read -->
+        <div class="sm:hidden">
+          <TableLoading
+            v-if="loading"
+            label="Loading recordings…"
+          />
+          <p
+            v-else-if="loadError || !results.items.length"
+            class="px-4 py-10 text-center text-body-sm text-muted"
+          >
+            {{ loadError ? 'Recordings couldn’t be loaded.' : hasFilters ? 'No recordings match these filters.' : 'No recordings today.' }}
+          </p>
+          <div
+            v-else
+            class="divide-y divide-muted"
+          >
+            <RecordingCard
+              v-for="recording in results.items"
+              :key="recording.id"
+              :recording="recording"
+              :columns="columns"
+              :selected="recording.id === selectedId"
+              @open="openRecording(recording)"
+            />
+          </div>
+        </div>
       </UCard>
 
       <div

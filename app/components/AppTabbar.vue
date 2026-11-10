@@ -25,13 +25,14 @@ const inkWidth = computed(() => {
     class="fixed inset-x-0 bottom-0 z-40 border-t border-muted bg-scrim pb-[env(safe-area-inset-bottom)] backdrop-blur-[16px] lg:hidden"
     aria-label="Primary"
   >
-    <div class="relative flex h-16 items-center justify-around px-3">
+    <!-- Icons with a label under each: touch screens have no tooltips -->
+    <div class="relative flex h-[76px] items-center justify-around px-3">
       <span
-        class="pointer-events-none absolute left-[30px] right-[30px] top-[26px] h-[1.5px] bg-border"
+        class="pointer-events-none absolute left-[30px] right-[30px] top-[29px] h-[1.5px] bg-border"
         aria-hidden="true"
       />
       <span
-        class="pointer-events-none absolute left-[30px] top-[26px] h-0.5 rounded-full bg-primary glow-primary transition-[width] duration-500 ease-ink"
+        class="pointer-events-none absolute left-[30px] top-[29px] h-0.5 rounded-full bg-primary glow-primary transition-[width] duration-500 ease-ink"
         :style="{ width: inkWidth }"
         aria-hidden="true"
       />
@@ -39,9 +40,8 @@ const inkWidth = computed(() => {
         v-for="(stop, i) in stops"
         :key="stop.to"
         :to="stop.to"
-        class="relative flex min-h-11 flex-col items-center justify-center"
+        class="relative flex min-h-11 flex-col items-center justify-center gap-1"
         :style="{ width: stopWidth }"
-        :aria-label="stop.label"
       >
         <span
           class="grid size-11 place-items-center rounded-subtle ring-1 transition-[color,background-color,transform] duration-[140ms] ease-ink"
@@ -54,6 +54,10 @@ const inkWidth = computed(() => {
             class="size-5"
           />
         </span>
+        <span
+          class="max-w-full truncate text-[10.5px] leading-3 font-med"
+          :class="i === activeIndex ? 'text-primary' : 'text-muted'"
+        >{{ stop.label }}</span>
       </NuxtLink>
     </div>
   </nav>

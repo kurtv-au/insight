@@ -19,15 +19,14 @@ const recordingUrl = computed(() => props.recording
   ? `/api/tenants/${props.tenantId}/recordings/${encodeURIComponent(props.recording.id)}`
   : '')
 
-// Only the fields the account can see come from the server
+// Only the fields the account can see come from the server. The time and
+// caller ID are the drawer's title, so they aren't repeated here.
 const details = computed(() => {
   const r = props.recording
   if (!r) {
     return []
   }
   return [
-    { label: RECORDING_COLUMN_LABELS.timestamp, value: formatDateTime(r.startedAt) },
-    r.ani !== undefined && { label: RECORDING_COLUMN_LABELS.ani, value: formatPhone(r.ani) },
     r.accountNumber !== undefined && { label: RECORDING_COLUMN_LABELS.accountNumber, value: r.accountNumber },
     r.durationSeconds !== undefined && { label: RECORDING_COLUMN_LABELS.duration, value: formatDuration(r.durationSeconds) }
   ].filter(item => !!item)
@@ -57,7 +56,10 @@ const details = computed(() => {
           autoplay
         />
 
-        <dl class="divide-y divide-muted border-y border-muted">
+        <dl
+          v-if="details.length"
+          class="divide-y divide-muted border-y border-muted"
+        >
           <div
             v-for="item in details"
             :key="item.label"

@@ -29,8 +29,12 @@ export function formatDate(value: string | Date | null | undefined, timeZone?: s
   return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeZone }).format(new Date(value))
 }
 
-/** Date and time with the zone abbreviation, e.g. "Oct 28, 2026, 1:30 PM EDT" */
-export function formatDateTime(value: string | Date | null | undefined, timeZone?: string) {
+/**
+ * Date and time with the zone abbreviation, e.g. "Oct 28, 2026, 1:30 PM EDT".
+ * `zone: false` leaves the abbreviation off, for lists whose page already says
+ * which timezone times are in.
+ */
+export function formatDateTime(value: string | Date | null | undefined, timeZone?: string, { zone = true }: { zone?: boolean } = {}) {
   if (!value) {
     return '—'
   }
@@ -40,7 +44,7 @@ export function formatDateTime(value: string | Date | null | undefined, timeZone
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
-    timeZoneName: 'short',
+    ...(zone ? { timeZoneName: 'short' as const } : {}),
     timeZone
   }).format(new Date(value))
 }

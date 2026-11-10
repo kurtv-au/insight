@@ -906,3 +906,41 @@ export function sampleMessageRows(
     }
   })
 }
+
+/* ------------------------------------------------------- one message, as text */
+
+/**
+ * What names a message when its received time isn't shown: the first two list
+ * fields (in the account's list order) that have a value, formatted as the
+ * list shows them. Null when none do.
+ */
+export function messageHeadline(
+  message: Pick<MessageRow, 'fields'>,
+  fields: readonly Pick<MessageColumnField, 'fieldKey' | 'type' | 'format' | 'order' | 'showInList'>[],
+  timeZone: string
+): { title: string | null, subtitle: string | null } {
+  const values = listFields(fields)
+    .map(field => formatFieldValue(message.fields[field.fieldKey], field.type, field.format, { timeZone, context: 'list' }))
+    .filter(text => text !== EMPTY)
+  return { title: values[0] ?? null, subtitle: values[1] ?? null }
+}
+
+/**
+ * A message as plain text for the clipboard: one "Label: value" line per
+ * detail field that has a value, after the received time when it's shown.
+ */
+export function messageAsText(
+  message: Pick<MessageRow, 'fields'>,
+  fields: readonly Pick<MessageColumnField, 'fieldKey' | 'label' | 'type' | 'format' | 'order' | 'showInDetail'>[],
+  timeZone: string,
+  received?: string
+) {
+  const lines = received ? [`Received: ${received}`] : []
+  for (const field of detailFields(fields)) {
+    const text = formatFieldValue(message.fields[field.fieldKey], field.type, field.format, { timeZone, context: 'detail' })
+    if (text !== EMPTY) {
+      lines.push(`${field.label}: ${text}`)
+    }
+  }
+  return lines.join('\n')
+}

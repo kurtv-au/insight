@@ -10,18 +10,28 @@ export interface AppNavItem {
 export function useAppNav() {
   const route = useRoute()
   const { user } = useUserSession()
-  const { tenant, can } = useTenant()
+  const { tenant, role } = useTenant()
+  const { data: myTenants } = useMyTenants()
+
+  // Outside an account (Account, Support…), someone with just one keeps its
+  // tabs, so getting back to their messages is one tap
+  const navTenant = computed(() => {
+    if (tenant.value) {
+      return { slug: tenant.value.slug, role: role.value }
+    }
+    const only = myTenants.value.length === 1 ? myTenants.value[0]! : null
+    return only && canOpenTenant(only.status, user.value?.isPlatformAdmin) ? { slug: only.slug, role: only.role } : null
+  })
 
   const tenantItems = computed<AppNavItem[]>(() => {
-    if (!tenant.value) {
+    if (!navTenant.value) {
       return []
     }
-    const base = `/t/${tenant.value.slug}`
+    const base = `/t/${navTenant.value.slug}`
     return [
-      { icon: 'i-lucide-layout-dashboard', label: 'Dashboard', to: base, exact: true },
       { icon: 'i-lucide-message-square', label: 'Messages', to: `${base}/messages` },
       { icon: 'i-lucide-audio-lines', label: 'Recordings', to: `${base}/recordings` },
-      ...(can('admin')
+      ...(hasRole(navTenant.value.role, 'admin') || user.value?.isPlatformAdmin
         ? [
             { icon: 'i-lucide-users', label: 'Members', to: `${base}/members` },
             { icon: 'i-lucide-settings', label: 'Settings', to: `${base}/settings` }

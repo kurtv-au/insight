@@ -16,6 +16,18 @@ const { data: members, refresh: refreshMembers } = await useFetch(`${apiBase}/me
   immediate: can('admin'),
   default: () => []
 })
+// Narrow a long list by any part of a name or email
+const memberSearch = ref('')
+const shownMembers = computed(() => {
+  const needle = memberSearch.value.trim().toLowerCase()
+  return needle
+    ? members.value.filter(member => member.name.toLowerCase().includes(needle) || member.email.toLowerCase().includes(needle))
+    : members.value
+})
+const memberCount = computed(() => shownMembers.value.length === members.value.length
+  ? `${members.value.length}`
+  : `${shownMembers.value.length} of ${members.value.length}`)
+
 const { data: invitations, refresh: refreshInvitations } = await useFetch(`${apiBase}/invitations`, {
   immediate: can('admin'),
   default: () => []
@@ -218,15 +230,34 @@ async function onInvite(event: FormSubmitEvent<z.output<typeof inviteSchema>>) {
 
     <template v-else>
       <section class="mt-10">
-        <SectionKicker
-          number="01"
-          label="Members"
-          :count="`${members.length}`"
-          class="mb-3"
-        />
-        <div class="divide-y divide-muted rounded-standard border border-default">
+        <div class="mb-3 flex flex-wrap items-end justify-between gap-3">
+          <SectionKicker
+            number="01"
+            label="Members"
+            :count="memberCount"
+            class="min-w-0 flex-1"
+          />
+          <UInput
+            v-if="members.length > 5"
+            v-model="memberSearch"
+            icon="i-lucide-search"
+            placeholder="Search members"
+            aria-label="Search members by name or email"
+            class="w-full sm:w-64"
+          />
+        </div>
+        <p
+          v-if="!shownMembers.length"
+          class="text-body-sm text-muted"
+        >
+          No members match “{{ memberSearch.trim() }}”.
+        </p>
+        <div
+          v-else
+          class="divide-y divide-muted rounded-standard border border-default"
+        >
           <div
-            v-for="member in members"
+            v-for="member in shownMembers"
             :key="member.userId"
             class="flex items-center gap-3 px-4 py-3"
           >
@@ -250,7 +281,7 @@ async function onInvite(event: FormSubmitEvent<z.output<typeof inviteSchema>>) {
                 <template v-if="member.name">
                   {{ member.email }} ·
                 </template>
-                last sign-in {{ formatDateTime(member.lastLoginAt) }}
+                {{ member.lastLoginAt ? `last sign-in ${formatDateTime(member.lastLoginAt)}` : 'never signed in' }}
               </p>
               <p
                 v-if="member.filterIds.length"
