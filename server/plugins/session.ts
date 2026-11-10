@@ -5,7 +5,8 @@ export default defineNitroPlugin(() => {
     if (!session.user) {
       return
     }
-    const user = await requireUser(event)
+    // On Nuxt 4 the hook gets the request's h3 event (see requestH3Event())
+    const user = await requireUser(requestH3Event(event))
     session.user = toSessionUser(user)
   })
 })

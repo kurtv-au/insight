@@ -258,3 +258,22 @@ describe('describeAuditEvent', () => {
     expect(describeAuditEvent({ action: 'future.thing', targetLabel: 'x', details: null, tenantName: null })).toBe('future.thing: x')
   })
 })
+
+describe('signInStillValid', () => {
+  const DAY = 24 * 60 * 60 * 1000
+  const MAX_AGE = 30 * 24 * 60 * 60
+  const now = Date.UTC(2026, 10, 9)
+
+  it('keeps a sign-in for 30 days, however often the session is written', async () => {
+    const { signInStillValid } = await import('../../server/utils/auth')
+    expect(signInStillValid(now - 29 * DAY, MAX_AGE, now)).toBe(true)
+    expect(signInStillValid(now - 30 * DAY, MAX_AGE, now)).toBe(false)
+  })
+
+  it('refuses a session without a sign-in time, or one from the future', async () => {
+    const { signInStillValid } = await import('../../server/utils/auth')
+    expect(signInStillValid(undefined, MAX_AGE, now)).toBe(false)
+    expect(signInStillValid('yesterday', MAX_AGE, now)).toBe(false)
+    expect(signInStillValid(now + DAY, MAX_AGE, now)).toBe(false)
+  })
+})

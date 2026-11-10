@@ -34,9 +34,10 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
-    // nuxt-auth-utils' sealed cookie session. A sign-in lasts 30 days from when
-    // it started: the cookie expires then, and h3 refuses older sealed data, so
-    // a copied cookie stops working too.
+    // nuxt-auth-utils' sealed cookie session (sealed with NUXT_APP_SECRET). A
+    // sign-in lasts 30 days: the cookie and sealed data expire 30 days after
+    // each write, and requireUser() also refuses a session whose sign-in
+    // (loggedInAt) is older, so a copied cookie can't keep itself alive.
     session: {
       maxAge: 60 * 60 * 24 * 30
     },

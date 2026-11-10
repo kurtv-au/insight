@@ -1,9 +1,8 @@
 import { eq, lt } from 'drizzle-orm'
-import type { H3Event } from 'h3'
 
 const CHALLENGE_TTL_MINUTES = 5
 
-export async function storeWebAuthnChallenge(_event: H3Event, challenge: string, attemptId: string) {
+export async function storeWebAuthnChallenge(_event: unknown, challenge: string, attemptId: string) {
   const db = useDb()
   await db.delete(tables.webauthnChallenges).where(lt(tables.webauthnChallenges.expiresAt, new Date()))
   await db.insert(tables.webauthnChallenges).values({
@@ -14,7 +13,7 @@ export async function storeWebAuthnChallenge(_event: H3Event, challenge: string,
 }
 
 /** Returns and deletes the stored challenge, so each challenge can be used only once */
-export async function getWebAuthnChallenge(_event: H3Event, attemptId: string) {
+export async function getWebAuthnChallenge(_event: unknown, attemptId: string) {
   const db = useDb()
   const row = await db.query.webauthnChallenges.findFirst({ where: eq(tables.webauthnChallenges.attemptId, attemptId) })
   await db.delete(tables.webauthnChallenges).where(eq(tables.webauthnChallenges.attemptId, attemptId))

@@ -406,7 +406,7 @@ read -rsp 'au-api insight-prod key: ' AU_KEY; echo     # never a customer's key,
 install -m 600 /dev/null /opt/insight/shared/.env
 cat > /opt/insight/shared/.env <<EOF
 NUXT_DATABASE_URL=mysql://insight:$APP_PW@$DB_HOST:3306/insight?ssl=Amazon%20RDS
-NUXT_SESSION_PASSWORD=$(openssl rand -hex 32)
+NUXT_APP_SECRET=$(openssl rand -hex 32)
 NUXT_PUBLIC_APP_URL=https://insight.answerunited.net
 NUXT_EMAIL_TRANSPORT=ses
 NUXT_EMAIL_FROM="Insight <no-reply@answerunited.com>"
@@ -563,8 +563,19 @@ sudo tail -f /var/log/nginx/access.log
 ### Changing the environment
 
 Edit `/opt/insight/shared/.env`, then run `sudo pm2 restart insight
---update-env`. A new `NUXT_SESSION_PASSWORD` signs everyone out; passkeys and
+--update-env`. A new `NUXT_APP_SECRET` signs everyone out; passkeys and
 passwords keep working.
+
+**Upgrading to 2.10.0** (nuxt-auth-utils 0.6): sessions are sealed with a key
+derived from `NUXT_APP_SECRET`, and `NUXT_SESSION_PASSWORD` is no longer used.
+Add the new secret **before** the release deploys (the deploy refuses an env
+file without it), and everyone is signed out once:
+
+```bash
+sudo sh -c 'echo "NUXT_APP_SECRET=$(openssl rand -hex 32)" >> /opt/insight/shared/.env'
+sudo sed -i '/^NUXT_SESSION_PASSWORD=/d' /opt/insight/shared/.env
+sudo cut -d= -f1 /opt/insight/shared/.env      # names only: NUXT_APP_SECRET, no NUXT_SESSION_PASSWORD
+```
 
 ### Replacing the instance
 
