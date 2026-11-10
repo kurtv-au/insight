@@ -255,21 +255,7 @@ async function removeAccountNumber(accountNumber: string) {
           label="Recording setup"
           class="mb-3"
         />
-        <UCard>
-          <template #header>
-            <div class="flex items-center gap-2">
-              <UBadge
-                label="Answer United only"
-                color="neutral"
-                variant="subtle"
-                icon="i-lucide-shield"
-              />
-              <p class="text-body-sm text-muted">
-                Customers don’t see this section.
-              </p>
-            </div>
-          </template>
-
+        <StaffOnlyCard>
           <div class="space-y-8">
             <div>
               <p class="text-sm font-medium text-default">
@@ -379,7 +365,7 @@ async function removeAccountNumber(accountNumber: string) {
               />
             </div>
           </div>
-        </UCard>
+        </StaffOnlyCard>
       </section>
 
       <section
@@ -391,21 +377,7 @@ async function removeAccountNumber(accountNumber: string) {
           label="Message setup"
           class="mb-3"
         />
-        <UCard>
-          <template #header>
-            <div class="flex items-center gap-2">
-              <UBadge
-                label="Answer United only"
-                color="neutral"
-                variant="subtle"
-                icon="i-lucide-shield"
-              />
-              <p class="text-body-sm text-muted">
-                Customers don’t see this section.
-              </p>
-            </div>
-          </template>
-
+        <StaffOnlyCard>
           <div class="flex flex-wrap items-center justify-between gap-4">
             <div class="min-w-0">
               <p class="text-sm font-medium text-default">
@@ -423,7 +395,7 @@ async function removeAccountNumber(accountNumber: string) {
               :to="`/t/${tenant?.slug}/settings/message-fields`"
             />
           </div>
-        </UCard>
+        </StaffOnlyCard>
       </section>
     </template>
   </div>
