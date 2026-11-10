@@ -505,17 +505,20 @@ rebuilt. Running the release again for it (a re-run, or by hand for a tag)
 deploys the stored tarball, which re-activates it. To ship a change, bump the
 version.
 
-A typical release, once `main` has what should ship:
+Work happens on `develop`; `main` only receives releases, so every commit on
+`main` is something that shipped or is about to. A typical release, once
+`develop` has what should ship:
 
 ```bash
-git switch main && git pull
-git switch -c release-2.1.0
+git switch develop && git pull
 npm pkg set version=2.1.0                     # the tag must match it
-git commit -am "Release 2.1.0" && git push -u origin release-2.1.0
-gh pr create --fill && gh pr merge --merge    # or merge it on GitHub after review
+git commit -am "Release 2.1.0" && git push
+gh pr create --base main --head develop --title "Release 2.1.0" --body "<what's in it>"
+gh pr merge --merge                           # or merge it on GitHub after review
 git switch main && git pull
 git tag -a v2.1.0 -m "<what's in it>"
 git push origin v2.1.0                        # starts the release workflow
+git switch develop                            # back to work
 
 gh run watch "$(gh run list --workflow release --limit 1 --json databaseId -q '.[0].databaseId')"
 curl -s https://insight.answerunited.net/api/health   # {"ok":true,"version":"v2.1.0"}

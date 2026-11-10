@@ -52,7 +52,8 @@ CI (`.github/workflows/ci.yml`) runs lint, typecheck and the Vitest unit tests, 
 ## Deployment
 
 - `docs/DEPLOYMENT.md` is the runbook: EC2 behind an ALB (TLS ends at the ALB), nginx on port 80, PM2, releases built offline in GitHub Actions and activated over SSM by `deploy/activate.sh`. Keep it in sync with `deploy/`, `scripts/build-*.sh`, `ecosystem.config.cjs` and the workflows.
-- Release by bumping `package.json` `version` and pushing the matching `vX.Y.Z` tag. Versions already in S3 are never rebuilt.
+- Branches: work happens on `develop`; `main` only receives releases. Commit to `develop` (or a short-lived branch merged into it), never directly to `main`.
+- Release by bumping `package.json` `version` on `develop`, merging `develop` into `main` with a pull request titled "Release X.Y.Z", then pushing the matching `vX.Y.Z` tag on `main`. Versions already in S3 are never rebuilt.
 - Migrations run before the switch and are never reversed on rollback, so they must be additive: the previous release has to keep working against the new schema.
 - `/api/health` must stay free of database and au-api calls (it's the ALB health check and the deploy check).
 - Builds run with no network: nothing may be fetched at build time (fonts are self-hosted in `public/fonts/`). A new dependency changes the build-cache key; the `build-cache` workflow refreshes it.
