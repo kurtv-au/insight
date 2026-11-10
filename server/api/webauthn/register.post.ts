@@ -4,7 +4,7 @@ import type { WebAuthnCredential } from '#auth-utils'
 // Adds a passkey to the signed-in user's account
 export default defineWebAuthnRegisterEventHandler({
   async validateUser(body, event) {
-    const user = await requireUser(event)
+    const user = await requireUser(requestH3Event(event))
     const passkeyName = typeof body.passkeyName === 'string' ? body.passkeyName.trim().slice(0, 255) : ''
     // Always register against the session's user, never the client-supplied name
     return {
@@ -24,7 +24,7 @@ export default defineWebAuthnRegisterEventHandler({
     }
   },
   async excludeCredentials(event) {
-    const user = await requireUser(event)
+    const user = await requireUser(requestH3Event(event))
     const existing = await useDb().query.passkeys.findMany({ where: eq(tables.passkeys.userId, user.id) })
     return existing.map(passkey => ({
       id: passkey.id,
@@ -36,8 +36,8 @@ export default defineWebAuthnRegisterEventHandler({
   async onSuccess(_event, { user, credential }) {
     await useDb().insert(tables.passkeys).values({
       id: credential.id,
-      userId: user.userId,
-      name: user.passkeyName,
+      userId: String(user.userId),
+      name: String(user.passkeyName),
       publicKey: credential.publicKey,
       counter: credential.counter,
       backedUp: credential.backedUp,

@@ -9,7 +9,7 @@ export default defineWebAuthnAuthenticateEventHandler({
   storeChallenge: storeWebAuthnChallenge,
   getChallenge: getWebAuthnChallenge,
   async getCredential(event, credentialId) {
-    rateLimitAuth(event, 'passkey')
+    rateLimitAuth(requestH3Event(event), 'passkey')
     const passkey = await useDb().query.passkeys.findFirst({ where: eq(tables.passkeys.id, credentialId) })
     if (!passkey) {
       throw createError({ statusCode: 400, message: 'This passkey is not registered with Insight.' })
@@ -29,10 +29,10 @@ export default defineWebAuthnAuthenticateEventHandler({
       .set({ counter: authenticationInfo.newCounter, lastUsedAt: new Date() })
       .where(eq(tables.passkeys.id, credential.id))
 
-    const user = await db.query.users.findFirst({ where: eq(tables.users.id, credential.userId) })
+    const user = await db.query.users.findFirst({ where: eq(tables.users.id, String(credential.userId)) })
     if (!user || user.disabledAt) {
       throw createError({ statusCode: 401, message: 'This account is disabled.' })
     }
-    await startSession(event, user)
+    await startSession(requestH3Event(event), user)
   }
 })

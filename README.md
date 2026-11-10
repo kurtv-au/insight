@@ -39,7 +39,7 @@ Insight is the web portal for Answer United customers to access their messages a
    | Variable | Description |
    |---|---|
    | `NUXT_DATABASE_URL` | MySQL connection string |
-   | `NUXT_SESSION_PASSWORD` | Secret for sealing session cookies (32+ characters). Generate one with `openssl rand -hex 32` |
+   | `NUXT_APP_SECRET` | Nuxt's app secret; session cookies are sealed with a key derived from it (32+ characters). Generate one with `openssl rand -hex 32` |
    | `NUXT_PUBLIC_APP_URL` | Public URL of the app, used in email links |
    | `NUXT_EMAIL_TRANSPORT` | `ses` to send through AWS SES, or `console` to print emails to the server log |
    | `NUXT_EMAIL_FROM` | Sender address (must be verified in SES) |
@@ -133,7 +133,7 @@ Orphan state is decided at save time. If a script later drops a field, the messa
 
 Tenant pages live under `/t/[slug]`, and tenant APIs under `/api/tenants/[tenantId]`. Every tenant API checks the caller's role with `requireTenantRole()` (`server/utils/auth.ts`). Roles are always read from the database, never from the session cookie.
 
-**Sign-in methods.** Password, emailed one-time link or 6-digit code (valid 15 minutes, 5 attempts), and passkeys (WebAuthn, added from the Account page). Sessions are sealed cookies that last 30 days from sign-in (`runtimeConfig.session.maxAge`): the cookie expires then, and older sealed data is refused, so a copied cookie stops working too. Changing a password, resetting it, or choosing **Sign out other devices** bumps the user's `sessionVersion`, which invalidates every other session. People moving from the old Insight (`insight.answerunited.com`, email and password only) were imported without a password: the public `/welcome` page walks them through a first sign-in by emailed link, `/login?from=v1` (where the old site's redirect points) shows a banner pointing there, `/login.html` 301s to it, and a failed password sign-in says to use the emailed link. See `docs/DEPLOYMENT.md`, "Retiring insight.answerunited.com".
+**Sign-in methods.** Password, emailed one-time link or 6-digit code (valid 15 minutes, 5 attempts), and passkeys (WebAuthn, added from the Account page). Sessions are cookies (`nuxt-auth-session`, nuxt-auth-utils 0.6) sealed with a key derived from `NUXT_APP_SECRET`, and a sign-in lasts 30 days (`runtimeConfig.session.maxAge`). The cookie's own expiry renews whenever the session is written, so `requireUser()` also refuses a session whose `loggedInAt` is older than that (`signInStillValid()`): a copied cookie stops working 30 days after the sign-in, however it's used. Changing a password, resetting it, or choosing **Sign out other devices** bumps the user's `sessionVersion`, which invalidates every other session. People moving from the old Insight (`insight.answerunited.com`, email and password only) were imported without a password: the public `/welcome` page walks them through a first sign-in by emailed link, `/login?from=v1` (where the old site's redirect points) shows a banner pointing there, `/login.html` 301s to it, and a failed password sign-in says to use the emailed link. See `docs/DEPLOYMENT.md`, "Retiring insight.answerunited.com".
 
 **Legal pages.** `/terms` and `/privacy` are public and use the `legal` layout. They're linked from the sign-in footer, the account menu and the Account page. When the app's data handling changes (new data stored, new providers, analytics), update `app/pages/privacy.vue` and its *Last updated* date.
 

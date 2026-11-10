@@ -38,22 +38,26 @@ env_value() {
   sed -n "s/^$1=//p" "$ENV_FILE" | tail -1 | sed -e 's/^"//' -e 's/"$//'
 }
 
-# Refuses an env file that is missing what production needs. nuxt-auth-utils
-# only logs a missing session password, and au-api / support fall back to 503s,
+# Refuses an env file that is missing what production needs. Without
+# NUXT_APP_SECRET every sign-in fails (Nuxt derives the session key from it),
+# and au-api / support fall back to 503s,
 # so without this a bad .env would pass the health check and fail for users.
 check_env() {
   local missing="" key value
-  for key in NUXT_DATABASE_URL NUXT_SESSION_PASSWORD NUXT_PUBLIC_APP_URL NUXT_AU_API_KEY NUXT_SUPPORT_EMAIL; do
+  for key in NUXT_DATABASE_URL NUXT_APP_SECRET NUXT_PUBLIC_APP_URL NUXT_AU_API_KEY NUXT_SUPPORT_EMAIL; do
     [ -n "$(env_value "$key")" ] || missing="$missing $key"
   done
   if [ -n "$missing" ]; then
     echo "ERROR: $ENV_FILE is missing:$missing (docs/DEPLOYMENT.md \"Environment file\")."
     return 1
   fi
-  value="$(env_value NUXT_SESSION_PASSWORD)"
+  value="$(env_value NUXT_APP_SECRET)"
   if [ "${#value}" -lt 32 ]; then
-    echo "ERROR: NUXT_SESSION_PASSWORD must be at least 32 characters (openssl rand -hex 32)."
+    echo "ERROR: NUXT_APP_SECRET must be at least 32 characters (openssl rand -hex 32)."
     return 1
+  fi
+  if [ -n "$(env_value NUXT_SESSION_PASSWORD)" ]; then
+    echo "NOTE: NUXT_SESSION_PASSWORD is no longer used (sessions use NUXT_APP_SECRET); remove it from $ENV_FILE."
   fi
   case "$(env_value NUXT_PUBLIC_APP_URL)" in
     https://*) ;;

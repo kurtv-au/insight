@@ -1,6 +1,20 @@
 import { and, eq } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 
+/**
+ * nuxt-auth-utils 0.6 types its session hooks and WebAuthn callbacks with
+ * `nuxt/server`'s portable RequestEvent. On Nuxt 4 (Nitro 2) the event it
+ * passes is still the request's h3 event, which requireUser(), startSession()
+ * and the rate limits read; anything else is refused rather than guessed at.
+ */
+export function requestH3Event(event: unknown): H3Event {
+  const h3 = event as Partial<H3Event>
+  if (!h3?.node?.req || !h3.context) {
+    throw createError({ statusCode: 500, message: 'Sign-in isn’t available right now' })
+  }
+  return h3 as H3Event
+}
+
 export function toSessionUser(user: DbUser) {
   return {
     id: user.id,
@@ -26,8 +40,18 @@ export async function findUserByEmail(email: string) {
 }
 
 /**
- * Loads the session's user from the database. Rejects disabled users and sessions
- * issued before the user's sessionVersion was bumped.
+ * Whether a session's sign-in is within the session lifetime. The cookie's own
+ * expiry renews whenever the session is written, so this is what ends a
+ * sign-in: 30 days after it happened, however it's been used since.
+ */
+export function signInStillValid(loggedInAt: unknown, maxAgeSeconds: number, now = Date.now()) {
+  return typeof loggedInAt === 'number' && loggedInAt <= now && now - loggedInAt < maxAgeSeconds * 1000
+}
+
+/**
+ * Loads the session's user from the database. Rejects disabled users, sessions
+ * issued before the user's sessionVersion was bumped, and sign-ins older than
+ * the session lifetime.
  */
 export async function requireUser(event: H3Event): Promise<DbUser> {
   if (event.context.user) {
@@ -36,8 +60,10 @@ export async function requireUser(event: H3Event): Promise<DbUser> {
 
   const session = await requireUserSession(event)
   const user = await useDb().query.users.findFirst({ where: eq(tables.users.id, session.user.id) })
+  const maxAge = Number(useRuntimeConfig().session.maxAge)
 
-  if (!user || user.disabledAt || user.sessionVersion !== session.secure?.sessionVersion) {
+  if (!user || user.disabledAt || user.sessionVersion !== session.secure?.sessionVersion
+    || !signInStillValid(session.loggedInAt, maxAge)) {
     await clearUserSession(event)
     throw createError({ statusCode: 401, message: 'Your session has expired. Please sign in again.' })
   }
