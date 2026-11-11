@@ -116,6 +116,25 @@ async function saveHistory(event: FormSubmitEvent<z.output<typeof historyForm>>)
   }
 }
 
+// Plan (platform admins only)
+const planOptions = PLANS.map(value => ({ value, label: PLAN_LABELS[value] }))
+const plan = ref<Plan>(tenant.value!.plan)
+const savingPlan = ref(false)
+async function savePlan() {
+  savingPlan.value = true
+  try {
+    await $fetch(`/api/admin/tenants/${tenantId}`, { method: 'PATCH', body: { plan: plan.value } })
+    if (context.value) {
+      context.value.tenant.plan = plan.value
+    }
+    toast.add({ title: `Plan set to ${PLAN_LABELS[plan.value]}`, color: 'success' })
+  } catch (err) {
+    toast.add({ title: errorMessage(err), color: 'error' })
+  } finally {
+    savingPlan.value = false
+  }
+}
+
 const accountNumberForm = z.object({ accountNumber: accountNumberSchema })
 const newAccount = reactive({ accountNumber: '' })
 const addingAccount = ref(false)
@@ -394,6 +413,46 @@ async function removeAccountNumber(accountNumber: string) {
               variant="outline"
               :to="`/t/${tenant?.slug}/settings/message-fields`"
             />
+          </div>
+        </StaffOnlyCard>
+      </section>
+
+      <section
+        v-if="user?.isPlatformAdmin"
+        class="mt-10"
+      >
+        <SectionKicker
+          number="06"
+          label="Plan"
+          class="mb-3"
+        />
+        <StaffOnlyCard>
+          <div class="space-y-4">
+            <UFormField
+              label="Plan"
+              help="Plans don’t change any features yet. Every account’s plan is listed on the Plans page."
+            >
+              <USelect
+                v-model="plan"
+                :items="planOptions"
+                class="w-full sm:max-w-xs"
+              />
+            </UFormField>
+            <div class="flex flex-wrap items-center gap-2">
+              <UButton
+                label="Save"
+                :loading="savingPlan"
+                :disabled="plan === tenant?.plan"
+                @click="savePlan"
+              />
+              <UButton
+                label="All plans"
+                icon="i-lucide-layers"
+                color="neutral"
+                variant="ghost"
+                to="/admin/plans"
+              />
+            </div>
           </div>
         </StaffOnlyCard>
       </section>

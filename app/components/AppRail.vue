@@ -35,6 +35,7 @@ const accountMenu = computed<DropdownMenuItem[][]>(() => [
       ? [
           { label: 'Admin', icon: 'i-lucide-shield', to: '/admin/tenants' },
           { label: 'Platform admins', icon: 'i-lucide-shield-check', to: '/admin/admins' },
+          { label: 'Plans', icon: 'i-lucide-layers', to: '/admin/plans' },
           { label: 'Audit log', icon: 'i-lucide-scroll-text', to: '/admin/audit' }
         ]
       : []),

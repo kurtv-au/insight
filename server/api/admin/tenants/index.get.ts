@@ -22,6 +22,7 @@ export default defineEventHandler(async (event) => {
       slug: tables.tenants.slug,
       name: tables.tenants.name,
       status: tables.tenants.status,
+      plan: tables.tenants.plan,
       timezone: tables.tenants.timezone,
       createdAt: tables.tenants.createdAt,
       memberCount: count(tables.memberships.userId),

@@ -17,6 +17,8 @@ export const roleSchema = z.enum(ROLES)
 
 export const tenantStatusSchema = z.enum(TENANT_STATUSES)
 
+export const planSchema = z.enum(PLANS)
+
 export const supportRequestSchema = z.object({
   topic: z.enum(SUPPORT_TOPICS),
   tenantId: z.string().optional(),

@@ -1,5 +1,7 @@
 import { ROLE_LABELS } from './roles'
 import type { Role } from './roles'
+import { PLAN_LABELS } from './plans'
+import type { Plan } from './plans'
 
 /**
  * Changes to who can see what, recorded with who made them
@@ -50,6 +52,10 @@ function roleLabel(role: unknown) {
   return typeof role === 'string' && role in ROLE_LABELS ? ROLE_LABELS[role as Role] : String(role)
 }
 
+function planLabel(plan: unknown) {
+  return typeof plan === 'string' && plan in PLAN_LABELS ? PLAN_LABELS[plan as Plan] : show(plan)
+}
+
 function show(value: unknown): string {
   if (value === null || value === undefined || value === '') {
     return 'none'
@@ -66,14 +72,22 @@ const SETTING_LABELS: Record<string, string> = {
   timezone: 'timezone',
   recordingColumns: 'available recording columns',
   recordingDefaultColumns: 'default recording columns',
-  recordingHistoryDays: 'history (days)'
+  recordingHistoryDays: 'history (days)',
+  plan: 'plan'
 }
 
-/** "status from setup to active; name from A to B" */
+/** Settings whose stored values have their own wording */
+const VALUE_LABELS: Record<string, (value: unknown) => string> = {
+  plan: planLabel
+}
+
+/** "status from setup to active; plan from Basic+ to Pro" */
 function describeChanges(details: Record<string, unknown> | null) {
   const changes = (details?.changes ?? {}) as Record<string, AuditChange>
-  const parts = Object.entries(changes).map(([key, change]) =>
-    `${SETTING_LABELS[key] ?? key} from ${show(change.from)} to ${show(change.to)}`)
+  const parts = Object.entries(changes).map(([key, change]) => {
+    const label = VALUE_LABELS[key] ?? show
+    return `${SETTING_LABELS[key] ?? key} from ${label(change.from)} to ${label(change.to)}`
+  })
   return parts.length ? parts.join('; ') : 'no visible change'
 }
 
@@ -95,8 +109,11 @@ export function describeAuditEvent(event: Pick<AuditEventDto, 'action' | 'target
       return details.created ? `Made ${target} a platform admin (new sign-in)` : `Made ${target} a platform admin`
     case 'admin.removed':
       return `Removed ${target} as a platform admin`
-    case 'tenant.created':
-      return details.invitedOwner ? `Created the account and invited ${show(details.invitedOwner)} as owner` : 'Created the account'
+    case 'tenant.created': {
+      // Accounts created before plans have no plan in their details
+      const created = details.plan ? `Created the account on ${planLabel(details.plan)}` : 'Created the account'
+      return details.invitedOwner ? `${created} and invited ${show(details.invitedOwner)} as owner` : created
+    }
     case 'tenant.updated':
       return `Changed the account’s ${describeChanges(details)}`
     case 'tenant.deleted':

@@ -4,6 +4,7 @@ import { z } from 'zod'
 const bodySchema = z.object({
   name: nameSchema.optional(),
   status: tenantStatusSchema.optional(),
+  plan: planSchema.optional(),
   // Recording columns the account can use; timestamp is always included
   recordingColumns: recordingColumnsSchema.optional(),
   // Days of recordings the account can load

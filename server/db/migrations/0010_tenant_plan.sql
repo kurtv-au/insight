@@ -1,0 +1,1 @@
+ALTER TABLE `tenants` ADD `plan` enum('basic','basic_plus','pro','enterprise') DEFAULT 'basic_plus' NOT NULL;
