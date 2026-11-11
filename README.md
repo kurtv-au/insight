@@ -43,7 +43,7 @@ Insight is the web portal for Answer United customers to access their messages a
    | `NUXT_PUBLIC_APP_URL` | Public URL of the app, used in email links |
    | `NUXT_EMAIL_TRANSPORT` | `ses` to send through AWS SES, or `console` to print emails to the server log |
    | `NUXT_EMAIL_FROM` | Sender address (must be verified in SES) |
-   | `NUXT_SUPPORT_EMAIL` | Address that receives messages from the support form. Replies go to the sender |
+   | `NUXT_SUPPORT_EMAIL` | Address that receives messages from the support form, also shown as its Customer Service email. Replies go to the sender |
    | `NUXT_AWS_REGION` | SES region. Credentials come from the standard AWS chain (env vars, `AWS_PROFILE`, or an IAM role) |
    | `NUXT_AU_API_URL` | au-api, the source of recordings, message scripts and messages (default `https://api.answerunited.net`) |
    | `NUXT_AU_API_KEY` | This environment's insight key for au-api. Leave it empty in development to use mock data; production returns 503 without it |

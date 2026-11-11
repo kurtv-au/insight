@@ -14,11 +14,15 @@ const { data: myTenants } = await useMyTenants()
 
 const NO_ACCOUNT = 'none'
 
-const contacts = [
-  { icon: 'i-lucide-headset', title: 'Customer Service', email: 'custserv@answerunited.com', phone: '(800) 259-0135' },
+// Customer Service shows the inbox the form delivers to (NUXT_SUPPORT_EMAIL),
+// so changing that setting updates both; without it the card shows the phone only
+const { data: support } = await useFetch('/api/support', { key: 'support-contact' })
+
+const contacts = computed(() => [
+  { icon: 'i-lucide-headset', title: 'Customer Service', email: support.value?.email ?? null, phone: '(800) 259-0135' },
   { icon: 'i-lucide-briefcase', title: 'Sales', email: 'sales@answerunited.com', phone: '(800) 937-5900' },
   { icon: 'i-lucide-receipt', title: 'Billing', email: 'billing@answerunited.com', phone: '(800) 873-0434' }
-]
+])
 
 const topicItems = SUPPORT_TOPICS.map(value => ({ value, label: SUPPORT_TOPIC_LABELS[value] }))
 const accountItems = computed(() => [
@@ -226,6 +230,7 @@ function telHref(phone: string) {
                 {{ contact.title }}
               </h3>
               <a
+                v-if="contact.email"
                 :href="`mailto:${contact.email}`"
                 class="mt-1 block truncate text-body-sm text-default underline decoration-primary/40 underline-offset-4 hover:decoration-primary"
               >{{ contact.email }}</a>
