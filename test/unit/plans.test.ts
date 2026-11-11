@@ -106,6 +106,13 @@ describe('PATCH /api/admin/tenants/[id]: plan', () => {
     expect(mocks.recordAudit).not.toHaveBeenCalled()
   })
 
+  it('no longer sets history, which comes from the plan', async () => {
+    body = { recordingHistoryDays: 30 }
+    await (await load(PATCH))({})
+    expect(writes).toEqual([])
+    expect(mocks.recordAudit).not.toHaveBeenCalled()
+  })
+
   it('records nothing when the plan is unchanged', async () => {
     body = { plan: 'basic_plus' }
     await (await load(PATCH))({})

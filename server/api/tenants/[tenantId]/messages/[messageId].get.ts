@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
         match
       })
     : null
-  const historyStart = messageHistoryStart(tenant.recordingHistoryDays)
+  const historyStart = messageHistoryStart(planHistoryDays(tenant.plan))
   if (!message || !message.createdAt || message.createdAt < historyStart || !messageMatches(message.values, match)) {
     throw createError({ statusCode: 404, message: 'Message not found' })
   }

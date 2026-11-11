@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
     return empty
   }
 
-  const range = resolveMessageRange(query, tenant.recordingHistoryDays)
+  const range = resolveMessageRange(query, planHistoryDays(tenant.plan))
   if (!range) {
     return empty
   }

@@ -44,7 +44,7 @@ const inkWidth = computed(() => {
         :style="{ width: stopWidth }"
       >
         <span
-          class="grid size-11 place-items-center rounded-subtle ring-1 transition-[color,background-color,transform] duration-[140ms] ease-ink"
+          class="relative grid size-11 place-items-center rounded-subtle ring-1 transition-[color,background-color,transform] duration-[140ms] ease-ink"
           :class="i === activeIndex
             ? 'bg-rail-active text-primary ring-primary dark:shadow-[inset_0_2px_6px_rgba(0,0,0,0.55)]'
             : 'bg-muted text-muted ring-muted'"
@@ -52,6 +52,12 @@ const inkWidth = computed(() => {
           <UIcon
             :name="stop.icon"
             class="size-5"
+          />
+          <UIcon
+            v-if="stop.locked"
+            name="i-lucide-lock"
+            class="absolute right-1 bottom-1 size-3 text-muted"
+            aria-label="not in this account’s plan"
           />
         </span>
         <span

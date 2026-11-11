@@ -38,6 +38,16 @@ const { data: filterData, refresh: refreshFilters } = await useFetch(`${apiBase}
   default: () => ({ filters: [] as MessageFilterDto[], fields: [] })
 })
 
+// The plan's user limit counts members and pending invitations (the server
+// enforces it; staff are counted the same way)
+const maxUsers = computed(() => planMaxUsers(tenant.value!.plan))
+const seatsUsed = computed(() => members.value.length + invitations.value.length)
+const accountFull = computed(() => seatsUsed.value >= maxUsers.value)
+const seatSummary = computed(() => {
+  const summary = `Users: ${seatsUsed.value} of ${maxUsers.value} on the ${PLAN_LABELS[tenant.value!.plan]} plan, counting pending invitations`
+  return seatsUsed.value > maxUsers.value ? `${summary}. Over the limit: nobody new can join.` : `${summary}.`
+})
+
 type Member = typeof members.value[number]
 type Invitation = typeof invitations.value[number]
 
@@ -211,13 +221,44 @@ async function onInvite(event: FormSubmitEvent<z.output<typeof inviteSchema>>) {
         v-if="can('admin')"
         #actions
       >
+        <UPopover v-if="accountFull">
+          <UButton
+            label="Invite member"
+            icon="i-lucide-lock"
+            color="neutral"
+            variant="outline"
+          />
+          <template #content>
+            <div class="flex max-w-72 flex-col gap-1 p-4 text-body-sm">
+              <p class="font-medium text-highlighted">
+                No room for another user
+              </p>
+              <p class="text-muted">
+                The {{ PLAN_LABELS[tenant!.plan] }} plan includes up to {{ maxUsers }} {{ maxUsers === 1 ? 'user' : 'users' }}. Remove someone or cancel an invitation, or
+                <NuxtLink
+                  :to="`/support?account=${tenant!.slug}`"
+                  class="text-default underline decoration-primary/40 underline-offset-4 hover:decoration-primary"
+                >contact us to add more</NuxtLink>.
+              </p>
+            </div>
+          </template>
+        </UPopover>
         <UButton
+          v-else
           label="Invite member"
           icon="i-lucide-user-plus"
           @click="inviteOpen = true"
         />
       </template>
     </PageHeader>
+
+    <p
+      v-if="can('admin')"
+      class="mono-meta mt-4"
+      :class="seatsUsed > maxUsers && 'text-warning'"
+    >
+      {{ seatSummary }}
+    </p>
 
     <UAlert
       v-if="!can('admin')"

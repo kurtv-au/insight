@@ -47,9 +47,10 @@ const messageSetupSummary = computed(() => {
   return `${count}${source}.${orphaned ? ` ${orphaned} no longer in the script.` : ''}`
 })
 
-// Recording columns
+// Recording columns. Plans without recordings show them locked (staff still open them).
+const recordingsLocked = computed(() => !planIncludes(tenant.value!.plan, 'recordings') && !user.value?.isPlatformAdmin)
 const { data: recordingConfig, refresh: refreshRecordingConfig } = await useFetch(`/api/tenants/${tenantId}/recordings/config`, {
-  immediate: can('admin')
+  immediate: can('admin') && !recordingsLocked.value
 })
 
 function columnItems(columns: readonly RecordingColumn[]) {
@@ -91,28 +92,6 @@ async function saveAvailableColumns() {
     toast.add({ title: errorMessage(err), color: 'error' })
   } finally {
     savingAvailable.value = false
-  }
-}
-
-const historyForm = z.object({ recordingHistoryDays: recordingHistoryDaysSchema })
-const history = reactive({ recordingHistoryDays: DEFAULT_RECORDING_HISTORY_DAYS })
-watch(() => recordingConfig.value?.historyDays, (days) => {
-  if (days) {
-    history.recordingHistoryDays = days
-  }
-}, { immediate: true })
-
-const savingHistory = ref(false)
-async function saveHistory(event: FormSubmitEvent<z.output<typeof historyForm>>) {
-  savingHistory.value = true
-  try {
-    await $fetch(`/api/admin/tenants/${tenantId}`, { method: 'PATCH', body: event.data })
-    await refreshRecordingConfig()
-    toast.add({ title: `History set to ${event.data.recordingHistoryDays} ${event.data.recordingHistoryDays === 1 ? 'day' : 'days'}`, color: 'success' })
-  } catch (err) {
-    toast.add({ title: errorMessage(err), color: 'error' })
-  } finally {
-    savingHistory.value = false
   }
 }
 
@@ -224,7 +203,7 @@ async function removeAccountNumber(accountNumber: string) {
       </section>
 
       <section
-        v-if="recordingConfig"
+        v-if="recordingConfig || recordingsLocked"
         class="mt-10"
       >
         <SectionKicker
@@ -232,7 +211,12 @@ async function removeAccountNumber(accountNumber: string) {
           label="Recordings"
           class="mb-3"
         />
-        <UCard>
+        <PlanLocked
+          v-if="recordingsLocked"
+          feature="recordings"
+          title="Call recordings"
+        />
+        <UCard v-else>
           <div class="space-y-4">
             <UFormField
               label="Default columns"
@@ -240,7 +224,7 @@ async function removeAccountNumber(accountNumber: string) {
             >
               <UCheckboxGroup
                 v-model="defaultColumns"
-                :items="columnItems(recordingConfig.available)"
+                :items="columnItems(recordingConfig?.available ?? [])"
                 class="mt-1"
               />
             </UFormField>
@@ -340,31 +324,14 @@ async function removeAccountNumber(accountNumber: string) {
               </UForm>
             </div>
 
-            <UForm
-              :schema="historyForm"
-              :state="history"
-              class="space-y-4"
-              @submit="saveHistory"
-            >
-              <UFormField
-                label="History"
-                name="recordingHistoryDays"
-                :help="`Days of recordings and messages this account can load, counting back from now. Default ${DEFAULT_RECORDING_HISTORY_DAYS}.`"
-              >
-                <UInputNumber
-                  v-model="history.recordingHistoryDays"
-                  :min="1"
-                  :max="MAX_RECORDING_HISTORY_DAYS"
-                  :step="1"
-                  class="w-full sm:max-w-40"
-                />
-              </UFormField>
-              <UButton
-                type="submit"
-                label="Save"
-                :loading="savingHistory"
-              />
-            </UForm>
+            <div>
+              <p class="text-sm font-medium text-default">
+                History
+              </p>
+              <p class="mt-1 text-body-sm text-muted">
+                {{ describeHistoryDays(planHistoryDays(tenant!.plan)) }} of recordings and messages, set by the {{ PLAN_LABELS[tenant!.plan] }} plan (section 06).
+              </p>
+            </div>
 
             <div class="space-y-4">
               <UFormField
@@ -430,7 +397,7 @@ async function removeAccountNumber(accountNumber: string) {
           <div class="space-y-4">
             <UFormField
               label="Plan"
-              help="Plans don’t change any features yet. Every account’s plan is listed on the Plans page."
+              help="Decides what this account’s users get. Staff open every feature whatever the plan."
             >
               <USelect
                 v-model="plan"
@@ -438,6 +405,28 @@ async function removeAccountNumber(accountNumber: string) {
                 class="w-full sm:max-w-xs"
               />
             </UFormField>
+            <div>
+              <p class="text-sm font-medium text-default">
+                {{ PLAN_LABELS[plan] }} includes
+              </p>
+              <ul class="mt-2 space-y-1 text-body-sm">
+                <li class="text-default">
+                  Up to {{ planMaxUsers(plan) }} {{ planMaxUsers(plan) === 1 ? 'user' : 'users' }}, and {{ describeHistoryDays(planHistoryDays(plan)) }} of history
+                </li>
+                <li
+                  v-for="feature in PLAN_FEATURES"
+                  :key="feature.key"
+                  class="flex items-center gap-2"
+                  :class="planIncludes(plan, feature.key) ? 'text-default' : 'text-dimmed line-through'"
+                >
+                  <UIcon
+                    :name="planIncludes(plan, feature.key) ? 'i-lucide-check' : 'i-lucide-minus'"
+                    class="size-4 shrink-0"
+                  />
+                  {{ feature.label }}
+                </li>
+              </ul>
+            </div>
             <div class="flex flex-wrap items-center gap-2">
               <UButton
                 label="Save"

@@ -17,7 +17,7 @@ class HttpError extends Error {
   }
 }
 
-const tenant = { id: 'tenant-1', slug: 'goodwill', timezone: 'America/Chicago', recordingHistoryDays: 365 }
+const tenant = { id: 'tenant-1', slug: 'goodwill', timezone: 'America/Chicago', plan: 'basic_plus' as const }
 const fields = [{ fieldKey: 'Name', label: 'Name', type: 'text', format: {}, order: 0, showInList: true, showInDetail: true }]
 const match = { GALLEY: ['GL7112'] }
 

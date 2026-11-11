@@ -6,9 +6,8 @@ const bodySchema = z.object({
   status: tenantStatusSchema.optional(),
   plan: planSchema.optional(),
   // Recording columns the account can use; timestamp is always included
-  recordingColumns: recordingColumnsSchema.optional(),
-  // Days of recordings the account can load
-  recordingHistoryDays: recordingHistoryDaysSchema.optional()
+  recordingColumns: recordingColumnsSchema.optional()
+  // History isn't set here: it comes from the plan (planHistoryDays())
 })
 
 export default defineEventHandler(async (event) => {

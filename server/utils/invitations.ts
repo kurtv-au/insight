@@ -1,4 +1,4 @@
-import { and, eq, gt, isNull } from 'drizzle-orm'
+import { and, count, eq, gt, isNull, ne } from 'drizzle-orm'
 import { invitationEmail } from '../emails/invitation'
 
 const INVITATION_TTL_DAYS = 7
@@ -63,4 +63,21 @@ export function pendingInvitationsWhere(tenantId: string) {
     isNull(tables.invitations.revokedAt),
     gt(tables.invitations.expiresAt, new Date())
   )
+}
+
+/**
+ * Users an account's plan counts: its members plus its pending invitations.
+ * `exceptEmail` leaves out a pending invitation that's about to be replaced
+ * (createInvitation() revokes it), so re-sending one never needs a free seat.
+ */
+export async function tenantSeatsUsed(tenantId: string, { exceptEmail }: { exceptEmail?: string } = {}) {
+  const db = useDb()
+  const [[members], [pending]] = await Promise.all([
+    db.select({ n: count() }).from(tables.memberships).where(eq(tables.memberships.tenantId, tenantId)),
+    db.select({ n: count() }).from(tables.invitations).where(and(
+      pendingInvitationsWhere(tenantId),
+      exceptEmail ? ne(tables.invitations.email, normalizeEmail(exceptEmail)) : undefined
+    ))
+  ])
+  return (members?.n ?? 0) + (pending?.n ?? 0)
 }

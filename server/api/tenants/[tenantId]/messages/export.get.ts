@@ -12,13 +12,15 @@ const querySchema = messageRangeQuerySchema.extend({
  */
 export default defineEventHandler(async (event) => {
   const tenantId = getRouterParam(event, 'tenantId')!
-  const { user, tenant } = await requireTenantRole(event, tenantId, 'viewer')
+  const access = await requireTenantRole(event, tenantId, 'viewer')
+  requirePlanFeature(access, 'export')
+  const { user, tenant } = access
   const query = await getValidatedQuery(event, querySchema.parse)
   rateLimit(`messages-export:${user.id}`, 30, 60 * 60)
 
   const timeZone = query.tz ?? tenant.timezone
   const [fields, receivedSetting] = await Promise.all([visibleMessageFields(tenantId), messageReceivedSetting(tenantId)])
-  const range = fields.length ? resolveMessageRange(query, tenant.recordingHistoryDays) : null
+  const range = fields.length ? resolveMessageRange(query, planHistoryDays(tenant.plan)) : null
 
   const rows: MessageRow[] = []
   if (range) {

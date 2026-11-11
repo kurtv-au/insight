@@ -101,18 +101,24 @@ function itemClass(item: AppNavItem) {
       <UTooltip
         v-for="item in [...tenantItems, ...adminItems]"
         :key="item.to"
-        :text="item.label"
+        :text="item.locked ? `${item.label} (not in this plan)` : item.label"
         :content="{ side: 'right', sideOffset: 6 }"
         :delay-duration="0"
       >
         <NuxtLink
           :to="item.to"
+          class="relative"
           :class="itemClass(item)"
-          :aria-label="item.label"
+          :aria-label="item.locked ? `${item.label}, not in this account’s plan` : item.label"
         >
           <UIcon
             :name="item.icon"
             class="size-[18px]"
+          />
+          <UIcon
+            v-if="item.locked"
+            name="i-lucide-lock"
+            class="absolute right-0.5 bottom-0.5 size-3 text-muted"
           />
         </NuxtLink>
       </UTooltip>

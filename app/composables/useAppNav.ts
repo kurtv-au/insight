@@ -4,6 +4,8 @@ export interface AppNavItem {
   to: string
   /** Active only on this exact path, not on paths below it */
   exact?: boolean
+  /** Not in the account's plan: still shown, with a lock, and the page explains */
+  locked?: boolean
 }
 
 /** Navigation shared by the desktop rail and the mobile tab bar */
@@ -17,10 +19,10 @@ export function useAppNav() {
   // tabs, so getting back to their messages is one tap
   const navTenant = computed(() => {
     if (tenant.value) {
-      return { slug: tenant.value.slug, role: role.value }
+      return { slug: tenant.value.slug, role: role.value, plan: tenant.value.plan }
     }
     const only = myTenants.value.length === 1 ? myTenants.value[0]! : null
-    return only && canOpenTenant(only.status, user.value?.isPlatformAdmin) ? { slug: only.slug, role: only.role } : null
+    return only && canOpenTenant(only.status, user.value?.isPlatformAdmin) ? { slug: only.slug, role: only.role, plan: only.plan } : null
   })
 
   const tenantItems = computed<AppNavItem[]>(() => {
@@ -28,9 +30,11 @@ export function useAppNav() {
       return []
     }
     const base = `/t/${navTenant.value.slug}`
+    // Staff open every feature, so they can support any account
+    const locked = (feature: PlanFeature) => !user.value?.isPlatformAdmin && !planIncludes(navTenant.value!.plan, feature)
     return [
       { icon: 'i-lucide-message-square', label: 'Messages', to: `${base}/messages` },
-      { icon: 'i-lucide-audio-lines', label: 'Recordings', to: `${base}/recordings` },
+      { icon: 'i-lucide-audio-lines', label: 'Recordings', to: `${base}/recordings`, locked: locked('recordings') },
       ...(hasRole(navTenant.value.role, 'admin') || user.value?.isPlatformAdmin
         ? [
             { icon: 'i-lucide-users', label: 'Members', to: `${base}/members` },

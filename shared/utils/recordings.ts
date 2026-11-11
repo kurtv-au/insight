@@ -24,9 +24,12 @@ export interface RecordingDto {
 
 export const DEFAULT_AVAILABLE_COLUMNS: RecordingColumn[] = ['timestamp', 'ani', 'duration']
 
-/** How many days of recordings an account can load. Platform admins set it per account. */
+/**
+ * The old per-account history setting's default: still the column's default,
+ * and a fallback before a page's config loads. History now comes from the
+ * plan (planHistoryDays() in shared/utils/plans.ts).
+ */
 export const DEFAULT_RECORDING_HISTORY_DAYS = 365
-export const MAX_RECORDING_HISTORY_DAYS = 3650
 
 /** The earliest moment an account can load recordings from: a rolling window ending now */
 export function recordingHistoryStart(days: number, now = new Date()) {

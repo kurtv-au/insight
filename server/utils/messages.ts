@@ -63,8 +63,8 @@ export function messageSource(): MessageSource {
 
 /**
  * The earliest moment a tenant's messages can be loaded from. Messages share
- * the recordings history setting. Rounded down to the minute so a range clamped
- * to it stays the same between requests (au-api caches by range).
+ * the plan's history window with recordings. Rounded down to the minute so a
+ * range clamped to it stays the same between requests (au-api caches by range).
  */
 export function messageHistoryStart(historyDays: number, now = new Date()) {
   const start = recordingHistoryStart(historyDays, now)

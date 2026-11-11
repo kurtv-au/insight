@@ -3,6 +3,7 @@ definePageMeta({ middleware: 'admin' })
 useSeoMeta({ title: 'Plans' })
 
 const { data: tenants } = await useFetch('/api/admin/tenants', { default: () => [] })
+type Tenant = typeof tenants.value[number]
 
 // Every plan in tier order, with its accounts (already sorted by name)
 const plans = computed(() => PLANS.map(plan => ({
@@ -11,7 +12,12 @@ const plans = computed(() => PLANS.map(plan => ({
 })))
 
 function sectionNumber(index: number) {
-  return String(index + 1).padStart(2, '0')
+  return String(index + 2).padStart(2, '0')
+}
+
+// Users the plan counts: members and pending invitations
+function seatsUsed(tenant: Tenant) {
+  return tenant.memberCount + tenant.pendingInvites
 }
 </script>
 
@@ -20,7 +26,7 @@ function sectionNumber(index: number) {
     <PageHeader
       kicker="Admin"
       title="Plans"
-      description="Every account is on a plan, which will decide the features it has. Change an account’s plan in its Settings."
+      description="Every account is on a plan, which decides what its users get. Change an account’s plan in its Settings. Staff open every feature whatever the plan."
     >
       <template #actions>
         <UButton
@@ -35,9 +41,108 @@ function sectionNumber(index: number) {
       </template>
     </PageHeader>
 
-    <AsideNote class="mt-6">
-      Plans don’t change any features yet.
-    </AsideNote>
+    <section
+      class="mt-10"
+      aria-labelledby="plan-features-heading"
+    >
+      <SectionKicker
+        number="01"
+        label="What each plan includes"
+        class="mb-3"
+      />
+      <h2
+        id="plan-features-heading"
+        class="sr-only"
+      >
+        What each plan includes
+      </h2>
+      <div class="overflow-x-auto rounded-standard border border-default">
+        <table class="w-full min-w-[560px] text-body-sm">
+          <thead>
+            <tr class="border-b border-default text-left">
+              <th
+                scope="col"
+                class="px-4 py-3 font-medium text-muted"
+              >
+                Feature
+              </th>
+              <th
+                v-for="plan in PLANS"
+                :key="plan"
+                scope="col"
+                class="px-4 py-3 text-center font-medium text-highlighted"
+              >
+                {{ PLAN_LABELS[plan] }}
+              </th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-muted">
+            <tr>
+              <th
+                scope="row"
+                class="px-4 py-2.5 text-left font-normal text-default"
+              >
+                Number of users
+              </th>
+              <td
+                v-for="plan in PLANS"
+                :key="plan"
+                class="px-4 py-2.5 text-center text-default"
+              >
+                Up to {{ planMaxUsers(plan) }}
+              </td>
+            </tr>
+            <tr>
+              <th
+                scope="row"
+                class="px-4 py-2.5 text-left font-normal text-default"
+              >
+                Data retention (history)
+              </th>
+              <td
+                v-for="plan in PLANS"
+                :key="plan"
+                class="px-4 py-2.5 text-center text-default"
+              >
+                {{ describeHistoryDays(planHistoryDays(plan)) }}
+              </td>
+            </tr>
+            <tr
+              v-for="feature in PLAN_FEATURES"
+              :key="feature.key"
+            >
+              <th
+                scope="row"
+                class="px-4 py-2.5 text-left font-normal text-default"
+              >
+                {{ feature.label }}
+                <span
+                  v-if="!feature.enforced"
+                  class="mono-meta block"
+                >Not enforced in the app</span>
+              </th>
+              <td
+                v-for="plan in PLANS"
+                :key="plan"
+                class="px-4 py-2.5 text-center"
+              >
+                <UIcon
+                  v-if="planIncludes(plan, feature.key)"
+                  name="i-lucide-check"
+                  class="size-4 text-primary"
+                  :aria-label="`Included in ${PLAN_LABELS[plan]}`"
+                />
+                <span
+                  v-else
+                  class="text-dimmed"
+                  :aria-label="`Not in ${PLAN_LABELS[plan]}`"
+                >–</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
     <section
       v-for="(group, index) in plans"
@@ -73,9 +178,16 @@ function sectionNumber(index: number) {
                 variant="subtle"
                 size="sm"
               />
+              <UBadge
+                v-if="seatsUsed(tenant) > planMaxUsers(tenant.plan)"
+                label="Over its user limit"
+                color="warning"
+                variant="subtle"
+                size="sm"
+              />
             </p>
             <p class="mono-meta truncate">
-              /t/{{ tenant.slug }} · {{ tenant.memberCount }} {{ tenant.memberCount === 1 ? 'member' : 'members' }}
+              /t/{{ tenant.slug }} · {{ seatsUsed(tenant) }} of {{ planMaxUsers(tenant.plan) }} users
             </p>
           </div>
           <UButton

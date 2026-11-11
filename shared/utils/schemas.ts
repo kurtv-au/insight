@@ -30,11 +30,6 @@ export const timezoneSchema = z.enum(TIMEZONE_IDS)
 
 export const recordingColumnsSchema = z.array(z.enum(RECORDING_COLUMNS)).max(RECORDING_COLUMNS.length)
 
-export const recordingHistoryDaysSchema = z.number('Enter a number of days')
-  .int('Use whole days')
-  .min(1, 'At least 1 day')
-  .max(MAX_RECORDING_HISTORY_DAYS, `At most ${MAX_RECORDING_HISTORY_DAYS} days`)
-
 /** A recording account number is a client number in the recordings API: digits, no leading zeros */
 export const accountNumberSchema = z.string()
   .trim()

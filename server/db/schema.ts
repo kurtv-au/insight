@@ -39,7 +39,8 @@ export const tenants = mysqlTable('tenants', {
   recordingColumns: json('recording_columns').$type<RecordingColumn[]>(),
   // Columns members see until they choose their own; null means every available column
   recordingDefaultColumns: json('recording_default_columns').$type<RecordingColumn[]>(),
-  // Days of recordings the account can load, counting back from now; set by platform admins
+  // No longer read: history comes from the plan (planHistoryDays()). Kept so a
+  // rolled-back release still finds it
   recordingHistoryDays: int('recording_history_days').notNull().default(DEFAULT_RECORDING_HISTORY_DAYS),
   createdAt: createdAt(),
   updatedAt: updatedAt()

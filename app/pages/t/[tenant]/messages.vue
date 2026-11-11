@@ -209,6 +209,9 @@ const updating = computed(() => fetching.value && !!shownPage.value && !quiet.va
 
 // Export: every message matching the filters, across all pages, as CSV
 const exporting = ref(false)
+// Basic doesn't include exports: its users see the button locked. Staff can still export.
+const planLacksExport = computed(() => !planIncludes(tenant.value!.plan, 'export'))
+const exportLocked = computed(() => planLacksExport.value && !cacheUser.value?.isPlatformAdmin)
 const canExport = computed(() => !!config.value?.configured && !fetching.value && !loadError.value && results.value.total > 0)
 
 async function exportCsv() {
@@ -494,15 +497,37 @@ const rangeNote = computed(() => `Messages go back ${historyDays.value} ${histor
               variant="outline"
             />
           </UDropdownMenu>
-          <UButton
-            label="Export CSV"
-            icon="i-lucide-download"
-            color="neutral"
-            variant="outline"
-            :loading="exporting"
-            :disabled="!canExport"
-            @click="exportCsv"
-          />
+          <UPopover v-if="exportLocked">
+            <UButton
+              label="Export CSV"
+              icon="i-lucide-lock"
+              color="neutral"
+              variant="outline"
+            />
+            <template #content>
+              <PlanLocked
+                class="p-4"
+                feature="export"
+                title="Export CSV"
+                compact
+              />
+            </template>
+          </UPopover>
+          <UTooltip
+            v-else
+            :text="`Not in the ${PLAN_LABELS[tenant!.plan]} plan. You can export as Answer United staff.`"
+            :disabled="!planLacksExport"
+          >
+            <UButton
+              label="Export CSV"
+              icon="i-lucide-download"
+              color="neutral"
+              variant="outline"
+              :loading="exporting"
+              :disabled="!canExport"
+              @click="exportCsv"
+            />
+          </UTooltip>
         </template>
       </PageHeader>
 

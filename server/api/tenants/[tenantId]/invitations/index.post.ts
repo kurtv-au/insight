@@ -26,6 +26,11 @@ export default defineEventHandler(async (event) => {
     }
   }
 
+  // Members and pending invitations both count, so accepting never overfills it
+  if (await tenantSeatsUsed(tenant.id, { exceptEmail: email }) >= planMaxUsers(tenant.plan)) {
+    throw createError({ statusCode: 409, message: seatLimitMessage(tenant.plan) })
+  }
+
   const id = await createInvitation({ tenant, email, role, invitedBy: user })
   await recordAudit(user, { action: 'invitation.sent', tenant, target: normalizeEmail(email), details: { role } })
   return { id }
