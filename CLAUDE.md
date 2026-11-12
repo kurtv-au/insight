@@ -31,6 +31,7 @@ CI (`.github/workflows/ci.yml`) runs lint, typecheck and the Vitest unit tests, 
 - Tenant pages are `/t/[slug]`; tenant APIs are `/api/tenants/[tenantId]/...`. Every tenant API must start with `requireTenantRole(event, tenantId, minRole)` (`server/utils/auth.ts`), which reads the role from the database, treats platform admins as owners, applies `canOpenTenant()`, and returns 404 to non-members. `useTenant().can()` on the client only hides UI.
 - `requireUser()` checks the session's `sessionVersion` against the user row; bumping it signs out every other session. `server/plugins/session.ts` revalidates on each session fetch.
 - Admin-only APIs use `requirePlatformAdmin()`; admin pages use the `admin` middleware.
+- Plans (`shared/utils/plans.ts`) gate features on the server with `requirePlanFeature()` after `requireTenantRole()` (platform admins get past it), and on the client with `PlanLocked` (shown locked, not hidden). User limits count members plus pending invitations (`tenantSeatsUsed()`).
 - Changes to access or setup (platform admins, tenants, account numbers, message setup, account settings, roles, members, invitations, message filters) call `recordAudit()` (`server/utils/audit.ts`) after they succeed, with an action from `AUDIT_ACTIONS` and a wording in `describeAuditEvent()` (`shared/utils/audit.ts`). Platform admins must be at `NUXT_PLATFORM_ADMIN_DOMAINS`.
 
 ## Recordings
@@ -46,8 +47,9 @@ CI (`.github/workflows/ci.yml`) runs lint, typecheck and the Vitest unit tests, 
 - Script fields come from au-api's `/v1/scripts/active` through `ScriptSource` (`server/utils/scripts.ts`), or the mock in development.
 - Message data comes from au-api's `/v1/messages` through `MessageSource` (`server/utils/messages.ts`, `server/messages/au-api.ts`), or the mock in development. `serializeMessage()` drops anything outside the visible fields, and search must too (au-api searches only the fields requested, so request only visible ones).
 - au-api limits: at most 50 fields per request (saves cap active fields at 50), names matching `RETRIEVABLE_FIELD_KEY`, and at most 7 days per request. Ranges come from the page as calendar days, so a week across DST is split into windows (`splitRange()`/`paginateWindows()`).
+- Every message route starts with `requireMessageAccess(event, tenantId)` (`server/utils/messages.ts`): membership, the plan's `messages` feature, and the plan's `historyDays`. A test checks every file under `server/api/tenants/[tenantId]/messages/` for it.
 - Message filters (`shared/utils/messageFilters.ts`, `server/utils/messageFilters.ts`): every message route must pass `memberMessageMatch(tenantId, user)` as the source's `match`, and a single message must be checked with `messageMatches()`. au-api applies `match` before totals and paging and confirms it with `meta.match`; the au-api source refuses (503) a filtered page without that confirmation. Match fields are never returned, searched or sorted. Nothing may widen a filtered member's view by accident (see the delete guard and `requireFilterableMember()`). Only viewers have filters (`assertFilterableRole()`), since admins and owners could edit their own.
-- The insight key spans every client: a single message must be checked against the tenant's own account numbers (and its history window, which is the recordings setting) before it's returned.
+- The insight key spans every client: a single message must be checked against the tenant's own account numbers (and its history window, which comes from the plan: `planHistoryDays()`) before it's returned.
 
 ## Deployment
 

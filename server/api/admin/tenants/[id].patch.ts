@@ -4,10 +4,10 @@ import { z } from 'zod'
 const bodySchema = z.object({
   name: nameSchema.optional(),
   status: tenantStatusSchema.optional(),
+  plan: planSchema.optional(),
   // Recording columns the account can use; timestamp is always included
-  recordingColumns: recordingColumnsSchema.optional(),
-  // Days of recordings the account can load
-  recordingHistoryDays: recordingHistoryDaysSchema.optional()
+  recordingColumns: recordingColumnsSchema.optional()
+  // History isn't set here: it comes from the plan (planHistoryDays())
 })
 
 export default defineEventHandler(async (event) => {

@@ -1,4 +1,4 @@
-import { and, eq, isNull } from 'drizzle-orm'
+import { and, count, eq, isNull, ne } from 'drizzle-orm'
 import { z } from 'zod'
 
 const bodySchema = z.object({
@@ -40,6 +40,20 @@ export default defineEventHandler(async (event) => {
       .where(and(eq(tables.invitations.id, invitation.id), isNull(tables.invitations.acceptedAt)))
     if (result.affectedRows !== 1) {
       return null
+    }
+
+    // Invitations are only sent with a free seat, so this only refuses after the
+    // account moved to a smaller plan. Throwing rolls back the acceptance.
+    const [members] = await tx.select({ n: count() }).from(tables.memberships).where(and(
+      eq(tables.memberships.tenantId, invitation.tenantId),
+      existing ? ne(tables.memberships.userId, existing.id) : undefined
+    ))
+    const max = planMaxUsers(invitation.tenant.plan)
+    if ((members?.n ?? 0) >= max) {
+      throw createError({
+        statusCode: 409,
+        message: `${invitation.tenant.name} is full: its plan includes up to ${max} ${max === 1 ? 'user' : 'users'}. Ask whoever invited you to make room.`
+      })
     }
 
     let id = existing?.id

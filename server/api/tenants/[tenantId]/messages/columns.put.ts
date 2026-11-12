@@ -12,7 +12,7 @@ const bodySchema = z.object({
 // to the account's default; hiding it is refused when it would leave no columns.
 export default defineEventHandler(async (event) => {
   const tenantId = getRouterParam(event, 'tenantId')!
-  const { user } = await requireTenantRole(event, tenantId, 'viewer')
+  const { user } = await requireMessageAccess(event, tenantId)
   const { columns, received } = await readValidatedBody(event, bodySchema.parse)
 
   let messageColumns: string[] | null = null

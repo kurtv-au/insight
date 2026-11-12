@@ -16,21 +16,36 @@ export default defineEventHandler(async (event) => {
     .groupBy(tables.invitations.tenantId)
     .as('pending')
 
+  // Every pending invitation, which counts toward the plan's user limit
+  const pendingInvites = db
+    .select({ tenantId: tables.invitations.tenantId, count: count().as('pending_invites') })
+    .from(tables.invitations)
+    .where(and(
+      isNull(tables.invitations.acceptedAt),
+      isNull(tables.invitations.revokedAt),
+      gt(tables.invitations.expiresAt, new Date())
+    ))
+    .groupBy(tables.invitations.tenantId)
+    .as('all_pending')
+
   return db
     .select({
       id: tables.tenants.id,
       slug: tables.tenants.slug,
       name: tables.tenants.name,
       status: tables.tenants.status,
+      plan: tables.tenants.plan,
       timezone: tables.tenants.timezone,
       createdAt: tables.tenants.createdAt,
       memberCount: count(tables.memberships.userId),
       ownerCount: sql<number>`cast(coalesce(sum(${tables.memberships.role} = 'owner'), 0) as unsigned)`.mapWith(Number),
-      pendingOwnerInvites: sql<number>`coalesce(max(${pendingOwnerInvites.count}), 0)`.mapWith(Number)
+      pendingOwnerInvites: sql<number>`coalesce(max(${pendingOwnerInvites.count}), 0)`.mapWith(Number),
+      pendingInvites: sql<number>`coalesce(max(${pendingInvites.count}), 0)`.mapWith(Number)
     })
     .from(tables.tenants)
     .leftJoin(tables.memberships, eq(tables.memberships.tenantId, tables.tenants.id))
     .leftJoin(pendingOwnerInvites, eq(pendingOwnerInvites.tenantId, tables.tenants.id))
+    .leftJoin(pendingInvites, eq(pendingInvites.tenantId, tables.tenants.id))
     .groupBy(tables.tenants.id)
     .orderBy(asc(tables.tenants.name))
 })

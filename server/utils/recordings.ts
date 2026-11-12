@@ -69,6 +69,8 @@ export async function recordingAudio(recording: Recording, range: string | undef
  */
 export async function requireRecordingAccess(event: H3Event, tenantId: string) {
   const access = await requireTenantRole(event, tenantId, 'viewer')
+  requirePlanFeature(access, 'recordings')
+  const historyDays = planHistoryDays(access.tenant.plan)
   const accounts = await useDb().query.tenantRecordingAccounts.findMany({
     where: eq(tables.tenantRecordingAccounts.tenantId, tenantId),
     orderBy: tables.tenantRecordingAccounts.accountNumber
@@ -78,8 +80,8 @@ export async function requireRecordingAccess(event: H3Event, tenantId: string) {
     accountNumbers: accounts.map(account => account.accountNumber),
     available: normalizeColumns(access.tenant.recordingColumns ?? DEFAULT_AVAILABLE_COLUMNS),
     accountDefault: access.tenant.recordingDefaultColumns ? normalizeColumns(access.tenant.recordingDefaultColumns) : null,
-    historyDays: access.tenant.recordingHistoryDays,
-    historyStart: recordingHistoryStart(access.tenant.recordingHistoryDays)
+    historyDays,
+    historyStart: recordingHistoryStart(historyDays)
   }
 }
 

@@ -5,13 +5,14 @@ const bodySchema = z.object({
   name: nameSchema,
   slug: slugSchema,
   ownerEmail: emailSchema.optional(),
-  timezone: timezoneSchema.optional()
+  timezone: timezoneSchema.optional(),
+  plan: planSchema.optional()
 })
 
 // Creates a tenant in `setup`, optionally inviting its first owner straight away
 export default defineEventHandler(async (event) => {
   const admin = await requirePlatformAdmin(event)
-  const { name, slug, ownerEmail, timezone } = await readValidatedBody(event, bodySchema.parse)
+  const { name, slug, ownerEmail, timezone, plan } = await readValidatedBody(event, bodySchema.parse)
   const db = useDb()
 
   if (await db.query.tenants.findFirst({ where: eq(tables.tenants.slug, slug) })) {
@@ -19,7 +20,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const id = crypto.randomUUID()
-  await db.insert(tables.tenants).values({ id, name, slug, timezone })
+  await db.insert(tables.tenants).values({ id, name, slug, timezone, plan })
   const tenant = (await db.query.tenants.findFirst({ where: eq(tables.tenants.id, id) }))!
 
   if (ownerEmail) {
@@ -28,7 +29,7 @@ export default defineEventHandler(async (event) => {
   await recordAudit(admin, {
     action: 'tenant.created',
     tenant,
-    details: { slug, ...(ownerEmail && { invitedOwner: normalizeEmail(ownerEmail) }) }
+    details: { slug, plan: tenant.plan, ...(ownerEmail && { invitedOwner: normalizeEmail(ownerEmail) }) }
   })
   return { id, slug, invited: !!ownerEmail }
 })

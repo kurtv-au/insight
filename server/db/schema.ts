@@ -15,6 +15,7 @@ import {
 } from 'drizzle-orm/mysql-core'
 import { ROLES } from '../../shared/utils/roles.ts'
 import { TENANT_STATUSES } from '../../shared/utils/tenants.ts'
+import { DEFAULT_PLAN, PLANS } from '../../shared/utils/plans.ts'
 import { DEFAULT_TIMEZONE } from '../../shared/utils/timezones.ts'
 import { DEFAULT_RECORDING_HISTORY_DAYS } from '../../shared/utils/recordings.ts'
 import type { RecordingColumn } from '../../shared/utils/recordings.ts'
@@ -30,13 +31,16 @@ export const tenants = mysqlTable('tenants', {
   slug: varchar('slug', { length: 64 }).notNull().unique(),
   name: varchar('name', { length: 255 }).notNull(),
   status: mysqlEnum('status', TENANT_STATUSES).notNull().default('setup'),
+  // The plan, which decides the account's features (shared/utils/plans.ts); set by platform admins
+  plan: mysqlEnum('plan', PLANS).notNull().default(DEFAULT_PLAN),
   // IANA timezone that messages and recordings are shown in, unless a user picks their own
   timezone: varchar('timezone', { length: 64 }).notNull().default(DEFAULT_TIMEZONE),
   // Recording columns platform admins make available; null means DEFAULT_AVAILABLE_COLUMNS
   recordingColumns: json('recording_columns').$type<RecordingColumn[]>(),
   // Columns members see until they choose their own; null means every available column
   recordingDefaultColumns: json('recording_default_columns').$type<RecordingColumn[]>(),
-  // Days of recordings the account can load, counting back from now; set by platform admins
+  // No longer read: history comes from the plan (planHistoryDays()). Kept so a
+  // rolled-back release still finds it
   recordingHistoryDays: int('recording_history_days').notNull().default(DEFAULT_RECORDING_HISTORY_DAYS),
   createdAt: createdAt(),
   updatedAt: updatedAt()

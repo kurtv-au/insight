@@ -64,9 +64,10 @@ function ownerBadge(tenant: Tenant) {
 // Create
 const createOpen = ref(false)
 // The owner can be invited now or later, once the account is configured
-const createSchema = z.object({ name: nameSchema, slug: slugSchema, timezone: timezoneSchema, ownerEmail: z.literal('').or(emailSchema) })
-const createState = reactive({ name: '', slug: '', timezone: DEFAULT_TIMEZONE, ownerEmail: '' })
+const createSchema = z.object({ name: nameSchema, slug: slugSchema, timezone: timezoneSchema, plan: planSchema, ownerEmail: z.literal('').or(emailSchema) })
+const createState = reactive({ name: '', slug: '', timezone: DEFAULT_TIMEZONE, plan: DEFAULT_PLAN as Plan, ownerEmail: '' })
 const timezoneOptions = timezoneItems()
+const planOptions = PLANS.map(value => ({ value, label: PLAN_LABELS[value] }))
 const slugEdited = ref(false)
 const creating = ref(false)
 
@@ -91,7 +92,7 @@ async function onCreate(event: FormSubmitEvent<z.output<typeof createSchema>>) {
       color: 'success'
     })
     createOpen.value = false
-    Object.assign(createState, { name: '', slug: '', timezone: DEFAULT_TIMEZONE, ownerEmail: '' })
+    Object.assign(createState, { name: '', slug: '', timezone: DEFAULT_TIMEZONE, plan: DEFAULT_PLAN, ownerEmail: '' })
     slugEdited.value = false
     await refresh()
   } catch (err) {
@@ -243,6 +244,15 @@ async function onInviteOwner(event: FormSubmitEvent<z.output<typeof inviteSchema
           <span class="hidden sm:inline">Audit log</span>
         </UButton>
         <UButton
+          icon="i-lucide-layers"
+          color="neutral"
+          variant="outline"
+          to="/admin/plans"
+          aria-label="Plans"
+        >
+          <span class="hidden sm:inline">Plans</span>
+        </UButton>
+        <UButton
           label="New account"
           icon="i-lucide-plus"
           @click="createOpen = true"
@@ -301,7 +311,7 @@ async function onInviteOwner(event: FormSubmitEvent<z.output<typeof inviteSchema
               />
             </p>
             <p class="mono-meta truncate">
-              /t/{{ tenant.slug }} · {{ tenant.memberCount }} {{ tenant.memberCount === 1 ? 'member' : 'members' }} · {{ timezoneLabel(tenant.timezone) }} · created {{ formatDate(tenant.createdAt) }}
+              /t/{{ tenant.slug }} · {{ PLAN_LABELS[tenant.plan] }} · {{ tenant.memberCount }} {{ tenant.memberCount === 1 ? 'member' : 'members' }} · {{ timezoneLabel(tenant.timezone) }} · created {{ formatDate(tenant.createdAt) }}
             </p>
           </div>
           <UDropdownMenu
@@ -375,6 +385,17 @@ async function onInviteOwner(event: FormSubmitEvent<z.output<typeof inviteSchema
             <USelect
               v-model="createState.timezone"
               :items="timezoneOptions"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            label="Plan"
+            name="plan"
+            help="You can change it later in the account’s Settings."
+          >
+            <USelect
+              v-model="createState.plan"
+              :items="planOptions"
               class="w-full"
             />
           </UFormField>

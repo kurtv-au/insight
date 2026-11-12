@@ -71,6 +71,13 @@
       "when": 1794273503360,
       "tag": "0009_audit_events",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1794438643047,
+      "tag": "0010_tenant_plan",
+      "breakpoints": true
     }
   ]
 }

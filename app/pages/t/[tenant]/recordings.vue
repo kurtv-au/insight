@@ -17,7 +17,13 @@ useSeoMeta({ title: 'Recordings' })
 const tenantId = tenant.value!.id
 const api = `/api/tenants/${tenantId}/recordings` as const
 
-const { data: config, refresh: refreshConfig } = await useFetch(`${api}/config`)
+// Basic accounts don't include recordings: their users see what the plan
+// lacks instead, and nothing is fetched. Staff still open them, with a note.
+const { user: viewer } = useUserSession()
+const planLacksRecordings = computed(() => !planIncludes(tenant.value!.plan, 'recordings'))
+const recordingsLocked = computed(() => planLacksRecordings.value && !viewer.value?.isPlatformAdmin)
+
+const { data: config, refresh: refreshConfig } = await useFetch(`${api}/config`, { immediate: !recordingsLocked.value })
 const available = computed(() => config.value?.available ?? [])
 const columns = ref<RecordingColumn[]>(config.value?.columns ?? ['timestamp'])
 watch(() => config.value?.columns, (value) => {
@@ -305,7 +311,7 @@ watch(() => results.value.items[selectedIndex.value], (recording) => {
 })
 // Waits for the list, which usually has it
 watch([selectedId, selectedIndex, fetching], async ([id, index, listLoading]) => {
-  if (id && index === -1 && !listLoading && linkedRecording.value?.id !== id) {
+  if (id && index === -1 && !listLoading && linkedRecording.value?.id !== id && !recordingsLocked.value) {
     try {
       linkedRecording.value = await requestFetch<RecordingDto>(`${api}/${encodeURIComponent(id)}`)
     } catch (err) {
@@ -378,158 +384,174 @@ function changePage(page: number) {
       </template>
     </PageHeader>
 
-    <UAlert
-      v-if="config && !config.hasAccountNumbers"
+    <PlanLocked
+      v-if="recordingsLocked"
       class="mt-10"
-      color="neutral"
-      variant="subtle"
-      icon="i-lucide-audio-lines"
-      title="No recordings yet"
-      description="Your call recordings will appear here once Answer United connects them to this account."
+      feature="recordings"
+      title="Call recordings"
     />
 
     <template v-else>
-      <div class="mt-10 flex flex-wrap items-center gap-2">
-        <UInput
-          v-if="searchPlaceholder"
-          v-model="search"
-          icon="i-lucide-search"
-          :placeholder="searchPlaceholder"
-          class="w-full sm:w-64"
-          :aria-label="searchPlaceholder"
-        />
-
-        <DateRangeFilter
-          :from="filters.from"
-          :to="filters.to"
-          :timezone="timezone"
-          :earliest="earliestDate"
-          :note="`Recordings go back ${historyDays} ${historyDays === 1 ? 'day' : 'days'}.`"
-          @change="setDates"
-        />
-
-        <USelect
-          v-if="available.includes('duration')"
-          :model-value="filters.min"
-          :items="durationItems"
-          class="w-36"
-          aria-label="Duration"
-          @update:model-value="updateQuery({ min: $event })"
-        />
-
-        <USelect
-          v-if="showAccountFilter"
-          :model-value="filters.account ?? ALL_ACCOUNTS"
-          :items="accountItems"
-          class="w-48"
-          aria-label="Account number"
-          @update:model-value="updateQuery({ acct: $event === ALL_ACCOUNTS ? undefined : $event })"
-        />
-
-        <UDropdownMenu
-          :items="sortMenu"
-          class="sm:hidden"
-        >
-          <UButton
-            :label="`Sort: ${RECORDING_COLUMN_LABELS[sort.by]}`"
-            :trailing-icon="SORT_ICONS[sort.direction]"
-            color="neutral"
-            variant="outline"
-            class="sm:hidden"
-          />
-        </UDropdownMenu>
-
-        <UButton
-          v-if="hasFilters"
-          label="Clear filters"
-          icon="i-lucide-x"
-          color="neutral"
-          variant="ghost"
-          @click="clearFilters"
-        />
-      </div>
+      <AsideNote
+        v-if="planLacksRecordings"
+        class="mt-6"
+      >
+        This account’s {{ PLAN_LABELS[tenant!.plan] }} plan doesn’t include recordings. You can open them as Answer United staff; its users see an upgrade notice.
+      </AsideNote>
 
       <UAlert
-        v-if="loadError && !loading"
-        class="mt-6"
-        color="error"
+        v-if="config && !config.hasAccountNumbers"
+        class="mt-10"
+        color="neutral"
         variant="subtle"
-        icon="i-lucide-circle-alert"
-        :title="errorMessage(loadError, 'Couldn’t load recordings')"
-        description="Your filters are kept. Try again in a moment."
-        :actions="[{ label: 'Try again', color: 'neutral', variant: 'outline', icon: 'i-lucide-refresh-cw', onClick: () => refresh() }]"
+        icon="i-lucide-audio-lines"
+        title="No recordings yet"
+        description="Your call recordings will appear here once Answer United connects them to this account."
       />
 
-      <p
-        v-else
-        class="mono-meta mt-6 min-h-5"
-      >
-        <template v-if="!loading">
-          {{ results.total.toLocaleString('en-US') }} {{ results.total === 1 ? 'recording' : 'recordings' }}
-        </template><template v-if="!loading && pageCount > 1">
-          · page {{ filters.page }} of {{ pageCount }}
-        </template>
-      </p>
-
-      <UCard
-        class="mt-3 transition-opacity"
-        :class="updating && 'opacity-60'"
-        :ui="{ body: 'p-0 sm:p-0' }"
-      >
-        <UTable
-          class="hidden sm:block"
-          :data="loadError ? [] : results.items"
-          :columns="tableColumns"
-          :meta="tableMeta"
-          :loading="loading"
-          :get-row-id="(row: RecordingDto) => row.id"
-          :empty="loadError ? 'Recordings couldn’t be loaded.' : hasFilters ? 'No recordings match these filters.' : 'No recordings today.'"
-          @select="(_e: Event, row: { original: RecordingDto }) => openRecording(row.original)"
-        >
-          <template #loading>
-            <TableLoading label="Loading recordings…" />
-          </template>
-        </UTable>
-
-        <!-- Phones: one card per call instead of a table too wide to read -->
-        <div class="sm:hidden">
-          <TableLoading
-            v-if="loading"
-            label="Loading recordings…"
+      <template v-else>
+        <div class="mt-10 flex flex-wrap items-center gap-2">
+          <UInput
+            v-if="searchPlaceholder"
+            v-model="search"
+            icon="i-lucide-search"
+            :placeholder="searchPlaceholder"
+            class="w-full sm:w-64"
+            :aria-label="searchPlaceholder"
           />
-          <p
-            v-else-if="loadError || !results.items.length"
-            class="px-4 py-10 text-center text-body-sm text-muted"
-          >
-            {{ loadError ? 'Recordings couldn’t be loaded.' : hasFilters ? 'No recordings match these filters.' : 'No recordings today.' }}
-          </p>
-          <div
-            v-else
-            class="divide-y divide-muted"
-          >
-            <RecordingCard
-              v-for="recording in results.items"
-              :key="recording.id"
-              :recording="recording"
-              :columns="columns"
-              :selected="recording.id === selectedId"
-              @open="openRecording(recording)"
-            />
-          </div>
-        </div>
-      </UCard>
 
-      <div
-        v-if="pageCount > 1"
-        class="mt-6 flex justify-center"
-      >
-        <UPagination
-          :page="filters.page"
-          :total="results.total"
-          :items-per-page="PAGE_SIZE"
-          @update:page="changePage"
+          <DateRangeFilter
+            :from="filters.from"
+            :to="filters.to"
+            :timezone="timezone"
+            :earliest="earliestDate"
+            :note="`Recordings go back ${historyDays} ${historyDays === 1 ? 'day' : 'days'}.`"
+            @change="setDates"
+          />
+
+          <USelect
+            v-if="available.includes('duration')"
+            :model-value="filters.min"
+            :items="durationItems"
+            class="w-36"
+            aria-label="Duration"
+            @update:model-value="updateQuery({ min: $event })"
+          />
+
+          <USelect
+            v-if="showAccountFilter"
+            :model-value="filters.account ?? ALL_ACCOUNTS"
+            :items="accountItems"
+            class="w-48"
+            aria-label="Account number"
+            @update:model-value="updateQuery({ acct: $event === ALL_ACCOUNTS ? undefined : $event })"
+          />
+
+          <UDropdownMenu
+            :items="sortMenu"
+            class="sm:hidden"
+          >
+            <UButton
+              :label="`Sort: ${RECORDING_COLUMN_LABELS[sort.by]}`"
+              :trailing-icon="SORT_ICONS[sort.direction]"
+              color="neutral"
+              variant="outline"
+              class="sm:hidden"
+            />
+          </UDropdownMenu>
+
+          <UButton
+            v-if="hasFilters"
+            label="Clear filters"
+            icon="i-lucide-x"
+            color="neutral"
+            variant="ghost"
+            @click="clearFilters"
+          />
+        </div>
+
+        <UAlert
+          v-if="loadError && !loading"
+          class="mt-6"
+          color="error"
+          variant="subtle"
+          icon="i-lucide-circle-alert"
+          :title="errorMessage(loadError, 'Couldn’t load recordings')"
+          description="Your filters are kept. Try again in a moment."
+          :actions="[{ label: 'Try again', color: 'neutral', variant: 'outline', icon: 'i-lucide-refresh-cw', onClick: () => refresh() }]"
         />
-      </div>
+
+        <p
+          v-else
+          class="mono-meta mt-6 min-h-5"
+        >
+          <template v-if="!loading">
+            {{ results.total.toLocaleString('en-US') }} {{ results.total === 1 ? 'recording' : 'recordings' }}
+          </template><template v-if="!loading && pageCount > 1">
+            · page {{ filters.page }} of {{ pageCount }}
+          </template>
+        </p>
+
+        <UCard
+          class="mt-3 transition-opacity"
+          :class="updating && 'opacity-60'"
+          :ui="{ body: 'p-0 sm:p-0' }"
+        >
+          <UTable
+            class="hidden sm:block"
+            :data="loadError ? [] : results.items"
+            :columns="tableColumns"
+            :meta="tableMeta"
+            :loading="loading"
+            :get-row-id="(row: RecordingDto) => row.id"
+            :empty="loadError ? 'Recordings couldn’t be loaded.' : hasFilters ? 'No recordings match these filters.' : 'No recordings today.'"
+            @select="(_e: Event, row: { original: RecordingDto }) => openRecording(row.original)"
+          >
+            <template #loading>
+              <TableLoading label="Loading recordings…" />
+            </template>
+          </UTable>
+
+          <!-- Phones: one card per call instead of a table too wide to read -->
+          <div class="sm:hidden">
+            <TableLoading
+              v-if="loading"
+              label="Loading recordings…"
+            />
+            <p
+              v-else-if="loadError || !results.items.length"
+              class="px-4 py-10 text-center text-body-sm text-muted"
+            >
+              {{ loadError ? 'Recordings couldn’t be loaded.' : hasFilters ? 'No recordings match these filters.' : 'No recordings today.' }}
+            </p>
+            <div
+              v-else
+              class="divide-y divide-muted"
+            >
+              <RecordingCard
+                v-for="recording in results.items"
+                :key="recording.id"
+                :recording="recording"
+                :columns="columns"
+                :selected="recording.id === selectedId"
+                @open="openRecording(recording)"
+              />
+            </div>
+          </div>
+        </UCard>
+
+        <div
+          v-if="pageCount > 1"
+          class="mt-6 flex justify-center"
+        >
+          <UPagination
+            :page="filters.page"
+            :total="results.total"
+            :items-per-page="PAGE_SIZE"
+            @update:page="changePage"
+          />
+        </div>
+      </template>
     </template>
 
     <RecordingDrawer

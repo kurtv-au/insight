@@ -4,6 +4,8 @@ import { EXPORT_PAGE_SIZE, MAX_EXPORT_MESSAGES, exportDate, loadAllMessages, mes
 import { isDefaultMessageSort, resolveMessageSort, sortMessageRows } from '../../shared/utils/messageFields'
 import { toCsv } from '../../shared/utils/csv'
 import type { MessageColumnField } from '../../shared/utils/messageFields'
+import { requirePlanFeature } from '../../server/utils/plans'
+import { requireMessageAccess } from '../../server/utils/messages'
 
 /**
  * GET /api/tenants/:tenantId/messages/export, run in plain Node with its Nitro
@@ -23,7 +25,7 @@ class HttpError extends Error {
 const fields: MessageColumnField[] = [
   { fieldKey: 'Name', label: 'Name', type: 'text', format: {}, order: 0, showInList: true, showInDetail: true }
 ]
-const tenant = { id: 'tenant-1', slug: 'goodwill', timezone: 'America/Chicago', recordingHistoryDays: 365 }
+const tenant = { id: 'tenant-1', slug: 'goodwill', timezone: 'America/Chicago', plan: 'basic_plus' as const }
 // Midnight to midnight in New York (the request's tz), across the Nov 1 DST change
 const range = { from: new Date('2026-10-26T04:00:00Z'), to: new Date('2026-11-02T05:00:00Z') }
 
@@ -54,6 +56,8 @@ beforeEach(() => {
     list
   }
   vi.stubGlobal('defineEventHandler', (handler: Handler) => handler)
+  vi.stubGlobal('requirePlanFeature', requirePlanFeature)
+  vi.stubGlobal('requireMessageAccess', requireMessageAccess)
   vi.stubGlobal('getRouterParam', () => 'tenant-1')
   vi.stubGlobal('createError', ({ statusCode, message }: { statusCode: number, message: string }) => new HttpError(statusCode, message))
   vi.stubGlobal('setResponseHeaders', (_event: unknown, values: Record<string, string>) => Object.assign(headers, values))
@@ -93,6 +97,22 @@ describe('GET /api/tenants/:tenantId/messages/export', () => {
     await expect((await load())({})).rejects.toMatchObject({ statusCode: 404 })
     expect(mocks.requireTenantRole).toHaveBeenCalledWith({}, 'tenant-1', 'viewer')
     expect(mocks.list).not.toHaveBeenCalled()
+  })
+
+  it('is refused on a plan without exports, before anything is loaded', async () => {
+    mocks.requireTenantRole!.mockResolvedValue({ user: { id: 'user-1' }, tenant: { ...tenant, plan: 'basic' }, role: 'owner' })
+    await expect((await load())({})).rejects.toMatchObject({
+      statusCode: 403,
+      message: 'Exports aren’t included in this account’s Basic plan. Available on Basic+ and up.'
+    })
+    expect(mocks.rateLimit).not.toHaveBeenCalled()
+    expect(mocks.list).not.toHaveBeenCalled()
+  })
+
+  it('still lets staff export on a plan without exports', async () => {
+    mocks.requireTenantRole!.mockResolvedValue({ user: { id: 'admin-1', isPlatformAdmin: true }, tenant: { ...tenant, plan: 'basic' }, role: 'owner' })
+    await (await load())({})
+    expect(mocks.list).toHaveBeenCalled()
   })
 
   it('loads only messages matching the person’s filters', async () => {

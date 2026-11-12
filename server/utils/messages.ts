@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { H3Event } from 'h3'
 import { auApiMessages, MESSAGES_UNAVAILABLE } from '../messages/au-api'
 import { mockMessages } from '../messages/mock'
 
@@ -62,9 +63,20 @@ export function messageSource(): MessageSource {
 }
 
 /**
+ * The entry point for every messages route: a member (viewer and up) of an
+ * account whose plan includes messages (staff get past the plan), with the
+ * plan's history window.
+ */
+export async function requireMessageAccess(event: H3Event, tenantId: string) {
+  const access = await requireTenantRole(event, tenantId, 'viewer')
+  requirePlanFeature(access, 'messages')
+  return { ...access, historyDays: planHistoryDays(access.tenant.plan) }
+}
+
+/**
  * The earliest moment a tenant's messages can be loaded from. Messages share
- * the recordings history setting. Rounded down to the minute so a range clamped
- * to it stays the same between requests (au-api caches by range).
+ * the plan's history window with recordings. Rounded down to the minute so a
+ * range clamped to it stays the same between requests (au-api caches by range).
  */
 export function messageHistoryStart(historyDays: number, now = new Date()) {
   const start = recordingHistoryStart(historyDays, now)

@@ -17,7 +17,13 @@ useSeoMeta({ title: 'Messages' })
 const tenantId = tenant.value!.id
 const api = `/api/tenants/${tenantId}/messages` as const
 
-const { data: config, refresh: refreshConfig } = await useFetch(`${api}/config`)
+// A plan without messages shows them locked to its users, and nothing is
+// fetched. Staff still open them, with a note. (Every plan includes them today.)
+const { user: viewer } = useUserSession()
+const planLacksMessages = computed(() => !planIncludes(tenant.value!.plan, 'messages'))
+const messagesLocked = computed(() => planLacksMessages.value && !viewer.value?.isPlatformAdmin)
+
+const { data: config, refresh: refreshConfig } = await useFetch(`${api}/config`, { immediate: !messagesLocked.value })
 const fields = computed(() => config.value?.fields ?? [])
 
 // Columns: each person's own choice of fields, and whether Received shows, saved per account
@@ -209,6 +215,9 @@ const updating = computed(() => fetching.value && !!shownPage.value && !quiet.va
 
 // Export: every message matching the filters, across all pages, as CSV
 const exporting = ref(false)
+// Basic doesn't include exports: its users see the button locked. Staff can still export.
+const planLacksExport = computed(() => !planIncludes(tenant.value!.plan, 'export'))
+const exportLocked = computed(() => planLacksExport.value && !viewer.value?.isPlatformAdmin)
 const canExport = computed(() => !!config.value?.configured && !fetching.value && !loadError.value && results.value.total > 0)
 
 async function exportCsv() {
@@ -494,19 +503,55 @@ const rangeNote = computed(() => `Messages go back ${historyDays.value} ${histor
               variant="outline"
             />
           </UDropdownMenu>
-          <UButton
-            label="Export CSV"
-            icon="i-lucide-download"
-            color="neutral"
-            variant="outline"
-            :loading="exporting"
-            :disabled="!canExport"
-            @click="exportCsv"
-          />
+          <UPopover v-if="exportLocked">
+            <UButton
+              label="Export CSV"
+              icon="i-lucide-lock"
+              color="neutral"
+              variant="outline"
+            />
+            <template #content>
+              <PlanLocked
+                class="p-4"
+                feature="export"
+                title="Export CSV"
+                compact
+              />
+            </template>
+          </UPopover>
+          <UTooltip
+            v-else
+            :text="`Not in the ${PLAN_LABELS[tenant!.plan]} plan. You can export as Answer United staff.`"
+            :disabled="!planLacksExport"
+          >
+            <UButton
+              label="Export CSV"
+              icon="i-lucide-download"
+              color="neutral"
+              variant="outline"
+              :loading="exporting"
+              :disabled="!canExport"
+              @click="exportCsv"
+            />
+          </UTooltip>
         </template>
       </PageHeader>
 
-      <template v-if="config && !config.configured">
+      <AsideNote
+        v-if="planLacksMessages && !messagesLocked"
+        class="mt-6"
+      >
+        This account’s {{ PLAN_LABELS[tenant!.plan] }} plan doesn’t include messages. You can open them as Answer United staff; its users see an upgrade notice.
+      </AsideNote>
+
+      <PlanLocked
+        v-if="messagesLocked"
+        class="mt-10"
+        feature="messages"
+        title="Messages"
+      />
+
+      <template v-else-if="config && !config.configured">
         <UAlert
           v-if="config.canConfigure"
           class="mt-10"

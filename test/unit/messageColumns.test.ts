@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { MESSAGE_RECEIVED_HIDDEN, MESSAGE_RECEIVED_SHOWN, messageColumnsSchema, resolveMessageColumns, resolveReceived, splitMessageColumns } from '../../shared/utils/messageFields'
 import type { MessageColumnField } from '../../shared/utils/messageFields'
+import { requirePlanFeature } from '../../server/utils/plans'
+import { requireMessageAccess } from '../../server/utils/messages'
 
 /**
  * Each person's own message columns: which fields their messages table shows.
@@ -111,11 +113,13 @@ describe('PUT /api/tenants/:tenantId/messages/columns', () => {
     saved = {}
     body = { columns: ['message', 'CallTime', 'Hidden', 'Covid19Travel'] }
     mocks = {
-      requireTenantRole: vi.fn(async () => ({ user: { id: 'user-1' }, tenant: { id: 'tenant-1' }, role: 'viewer' })),
+      requireTenantRole: vi.fn(async () => ({ user: { id: 'user-1' }, tenant: { id: 'tenant-1', plan: 'basic_plus' }, role: 'viewer' })),
       readValidatedBody: vi.fn(async (_event: unknown, parse: (b: unknown) => unknown) => parse(body)),
       visibleMessageFields: vi.fn(async () => [...fields].sort((a, b) => a.order - b.order))
     }
     vi.stubGlobal('defineEventHandler', (handler: Handler) => handler)
+    vi.stubGlobal('requirePlanFeature', requirePlanFeature)
+    vi.stubGlobal('requireMessageAccess', requireMessageAccess)
     vi.stubGlobal('getRouterParam', () => 'tenant-1')
     vi.stubGlobal('createError', ({ statusCode, message }: { statusCode: number, message: string }) => new HttpError(statusCode, message))
     vi.stubGlobal('messageColumnsSchema', messageColumnsSchema)
