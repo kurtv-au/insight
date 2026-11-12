@@ -114,6 +114,13 @@ async function savePlan() {
   }
 }
 
+// Account numbers (platform admins only). Messages and recordings both come
+// from these, so they have their own section whatever the plan includes.
+const { data: accountNumbersData, refresh: refreshAccountNumbers } = await useFetch(`/api/admin/tenants/${tenantId}/recording-accounts`, {
+  immediate: !!user.value?.isPlatformAdmin
+})
+const accountNumbers = computed(() => accountNumbersData.value?.accountNumbers ?? [])
+
 const accountNumberForm = z.object({ accountNumber: accountNumberSchema })
 const newAccount = reactive({ accountNumber: '' })
 const addingAccount = ref(false)
@@ -123,7 +130,7 @@ async function addAccountNumber(event: FormSubmitEvent<z.output<typeof accountNu
   try {
     await $fetch(`/api/admin/tenants/${tenantId}/recording-accounts`, { method: 'POST', body: event.data })
     newAccount.accountNumber = ''
-    await refreshRecordingConfig()
+    await refreshAccountNumbers()
     toast.add({ title: `${event.data.accountNumber} connected`, color: 'success' })
   } catch (err) {
     toast.add({ title: errorMessage(err), color: 'error' })
@@ -136,7 +143,7 @@ const confirm = useConfirm()
 async function removeAccountNumber(accountNumber: string) {
   const confirmed = await confirm({
     title: `Disconnect ${accountNumber}?`,
-    description: 'Recordings from this account number will no longer appear in this account.',
+    description: 'Messages and recordings from this account number will no longer appear in this account.',
     confirmLabel: 'Disconnect'
   })
   if (!confirmed) {
@@ -144,7 +151,7 @@ async function removeAccountNumber(accountNumber: string) {
   }
   try {
     await $fetch(`/api/admin/tenants/${tenantId}/recording-accounts/${encodeURIComponent(accountNumber)}`, { method: 'DELETE' })
-    await refreshRecordingConfig()
+    await refreshAccountNumbers()
   } catch (err) {
     toast.add({ title: errorMessage(err), color: 'error' })
   }
@@ -250,146 +257,11 @@ async function removeAccountNumber(accountNumber: string) {
       </section>
 
       <section
-        v-if="recordingConfig && user?.isPlatformAdmin"
+        v-if="user?.isPlatformAdmin"
         class="mt-10"
       >
         <SectionKicker
           number="04"
-          label="Recording setup"
-          class="mb-3"
-        />
-        <StaffOnlyCard>
-          <div class="space-y-8">
-            <div>
-              <p class="text-sm font-medium text-default">
-                Account numbers
-              </p>
-              <p class="mt-1 text-body-sm text-muted">
-                Recordings from these account numbers appear in this account.
-              </p>
-
-              <ul
-                v-if="recordingConfig.accountNumbers.length"
-                class="mt-3 divide-y divide-muted border-y border-muted"
-              >
-                <li
-                  v-for="accountNumber in recordingConfig.accountNumbers"
-                  :key="accountNumber"
-                  class="flex items-center justify-between gap-3 py-2"
-                >
-                  <span class="tabular-nums text-highlighted">{{ accountNumber }}</span>
-                  <UButton
-                    icon="i-lucide-x"
-                    color="neutral"
-                    variant="ghost"
-                    size="sm"
-                    :aria-label="`Disconnect ${accountNumber}`"
-                    @click="removeAccountNumber(accountNumber)"
-                  />
-                </li>
-              </ul>
-              <AsideNote
-                v-else
-                class="mt-3"
-              >
-                None yet, so this account has no recordings.
-              </AsideNote>
-
-              <UForm
-                :schema="accountNumberForm"
-                :state="newAccount"
-                class="mt-3 flex items-start gap-2"
-                @submit="addAccountNumber"
-              >
-                <UFormField
-                  name="accountNumber"
-                  class="w-full sm:max-w-xs"
-                >
-                  <UInput
-                    v-model="newAccount.accountNumber"
-                    placeholder="Account number"
-                    aria-label="Account number"
-                    inputmode="numeric"
-                    class="w-full"
-                  />
-                </UFormField>
-                <UButton
-                  type="submit"
-                  label="Add"
-                  icon="i-lucide-plus"
-                  color="neutral"
-                  variant="outline"
-                  :loading="addingAccount"
-                />
-              </UForm>
-            </div>
-
-            <div>
-              <p class="text-sm font-medium text-default">
-                History
-              </p>
-              <p class="mt-1 text-body-sm text-muted">
-                {{ describeHistoryDays(planHistoryDays(tenant!.plan)) }} of recordings and messages, set by the {{ PLAN_LABELS[tenant!.plan] }} plan (section 06).
-              </p>
-            </div>
-
-            <div class="space-y-4">
-              <UFormField
-                label="Available columns"
-                help="Columns this account can use. Owners and admins choose the defaults from these."
-              >
-                <UCheckboxGroup
-                  v-model="availableColumns"
-                  :items="columnItems(RECORDING_COLUMNS)"
-                  class="mt-1"
-                />
-              </UFormField>
-              <UButton
-                label="Save"
-                :loading="savingAvailable"
-                @click="saveAvailableColumns"
-              />
-            </div>
-          </div>
-        </StaffOnlyCard>
-      </section>
-
-      <section
-        v-if="user?.isPlatformAdmin"
-        class="mt-10"
-      >
-        <SectionKicker
-          number="05"
-          label="Message setup"
-          class="mb-3"
-        />
-        <StaffOnlyCard>
-          <div class="flex flex-wrap items-center justify-between gap-4">
-            <div class="min-w-0">
-              <p class="text-sm font-medium text-default">
-                Message fields
-              </p>
-              <p class="mt-1 text-body-sm text-muted">
-                {{ messageSetupSummary }}
-              </p>
-            </div>
-            <UButton
-              label="Configure message fields"
-              icon="i-lucide-list-checks"
-              color="neutral"
-              variant="outline"
-              :to="`/t/${tenant?.slug}/settings/message-fields`"
-            />
-          </div>
-        </StaffOnlyCard>
-      </section>
-
-      <section
-        v-if="user?.isPlatformAdmin"
-        class="mt-10"
-      >
-        <SectionKicker
-          number="06"
           label="Plan"
           class="mb-3"
         />
@@ -442,6 +314,143 @@ async function removeAccountNumber(accountNumber: string) {
                 to="/admin/plans"
               />
             </div>
+          </div>
+        </StaffOnlyCard>
+      </section>
+
+      <section
+        v-if="user?.isPlatformAdmin"
+        class="mt-10"
+      >
+        <SectionKicker
+          number="05"
+          label="Account numbers"
+          class="mb-3"
+        />
+        <StaffOnlyCard>
+          <p class="text-body-sm text-muted">
+            The client numbers this account’s messages and recordings come from, whatever its plan. Message setup (06) uses one of their scripts.
+          </p>
+
+          <ul
+            v-if="accountNumbers.length"
+            class="mt-3 divide-y divide-muted border-y border-muted"
+          >
+            <li
+              v-for="accountNumber in accountNumbers"
+              :key="accountNumber"
+              class="flex items-center justify-between gap-3 py-2"
+            >
+              <span class="tabular-nums text-highlighted">{{ accountNumber }}</span>
+              <UButton
+                icon="i-lucide-x"
+                color="neutral"
+                variant="ghost"
+                size="sm"
+                :aria-label="`Disconnect ${accountNumber}`"
+                @click="removeAccountNumber(accountNumber)"
+              />
+            </li>
+          </ul>
+          <AsideNote
+            v-else
+            class="mt-3"
+          >
+            None yet, so this account has no messages or recordings.
+          </AsideNote>
+
+          <UForm
+            :schema="accountNumberForm"
+            :state="newAccount"
+            class="mt-3 flex items-start gap-2"
+            @submit="addAccountNumber"
+          >
+            <UFormField
+              name="accountNumber"
+              class="w-full sm:max-w-xs"
+            >
+              <UInput
+                v-model="newAccount.accountNumber"
+                placeholder="Account number"
+                aria-label="Account number"
+                inputmode="numeric"
+                class="w-full"
+              />
+            </UFormField>
+            <UButton
+              type="submit"
+              label="Add"
+              icon="i-lucide-plus"
+              color="neutral"
+              variant="outline"
+              :loading="addingAccount"
+            />
+          </UForm>
+        </StaffOnlyCard>
+      </section>
+
+      <section
+        v-if="user?.isPlatformAdmin"
+        class="mt-10"
+      >
+        <SectionKicker
+          number="06"
+          label="Message setup"
+          class="mb-3"
+        />
+        <StaffOnlyCard>
+          <div class="flex flex-wrap items-center justify-between gap-4">
+            <div class="min-w-0">
+              <p class="text-sm font-medium text-default">
+                Message fields
+              </p>
+              <p class="mt-1 text-body-sm text-muted">
+                {{ messageSetupSummary }}
+              </p>
+            </div>
+            <UButton
+              label="Configure message fields"
+              icon="i-lucide-list-checks"
+              color="neutral"
+              variant="outline"
+              :to="`/t/${tenant?.slug}/settings/message-fields`"
+            />
+          </div>
+        </StaffOnlyCard>
+      </section>
+
+      <section
+        v-if="recordingConfig && user?.isPlatformAdmin"
+        class="mt-10"
+      >
+        <SectionKicker
+          number="07"
+          label="Recording setup"
+          class="mb-3"
+        />
+        <StaffOnlyCard>
+          <AsideNote
+            v-if="!planIncludes(tenant!.plan, 'recordings')"
+            class="mb-4"
+          >
+            The {{ PLAN_LABELS[tenant!.plan] }} plan doesn’t include recordings, so its users don’t see these. They’re kept for when the account moves up a plan.
+          </AsideNote>
+          <div class="space-y-4">
+            <UFormField
+              label="Available columns"
+              help="Columns this account can use. Owners and admins choose the defaults from these."
+            >
+              <UCheckboxGroup
+                v-model="availableColumns"
+                :items="columnItems(RECORDING_COLUMNS)"
+                class="mt-1"
+              />
+            </UFormField>
+            <UButton
+              label="Save"
+              :loading="savingAvailable"
+              @click="saveAvailableColumns"
+            />
           </div>
         </StaffOnlyCard>
       </section>
