@@ -4,7 +4,7 @@ import { and, eq } from 'drizzle-orm'
 // choice of which of them are table columns
 export default defineEventHandler(async (event) => {
   const tenantId = getRouterParam(event, 'tenantId')!
-  const { user, tenant } = await requireTenantRole(event, tenantId, 'viewer')
+  const { user, historyDays } = await requireMessageAccess(event, tenantId)
   const [fields, receivedSetting, filters] = await Promise.all([
     visibleMessageFields(tenantId),
     messageReceivedSetting(tenantId),
@@ -39,7 +39,7 @@ export default defineEventHandler(async (event) => {
     // The person's message filters, by name: they see only messages matching one
     filters: filters.map(filter => filter.name),
     // Messages share the plan's history window with recordings
-    historyDays: planHistoryDays(tenant.plan),
+    historyDays,
     maxRangeDays: MAX_MESSAGE_RANGE_DAYS
   }
 })

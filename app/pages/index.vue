@@ -4,10 +4,11 @@ const { data: tenants } = await useMyTenants()
 
 const canOpen = (tenant: typeof tenants.value[number]) => canOpenTenant(tenant.status, user.value?.isPlatformAdmin)
 
-// Skip the picker when there's only one tenant to choose, straight to its
-// messages; platform admins who belong to none go to All accounts
+// Skip the picker when there's only one tenant to choose, straight into it
+// (/t/[slug] picks the page its plan opens on); platform admins who belong to
+// none go to All accounts
 if (tenants.value.length === 1 && canOpen(tenants.value[0]!)) {
-  await navigateTo(`/t/${tenants.value[0]!.slug}/messages`, { replace: true })
+  await navigateTo(`/t/${tenants.value[0]!.slug}`, { replace: true })
 } else if (!tenants.value.length && user.value?.isPlatformAdmin) {
   await navigateTo('/admin/tenants', { replace: true })
 }

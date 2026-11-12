@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import * as schema from '../../server/db/schema'
+import { requirePlanFeature } from '../../server/utils/plans'
+import { requireMessageAccess } from '../../server/utils/messages'
 
 /**
  * Message filters on the server, run in plain Node with the Nitro auto-imports
@@ -50,6 +52,8 @@ beforeEach(() => {
     update: vi.fn(() => ({ set: () => ({ where: async () => undefined }) }))
   }
   vi.stubGlobal('defineEventHandler', (handler: Handler) => handler)
+  vi.stubGlobal('requirePlanFeature', requirePlanFeature)
+  vi.stubGlobal('requireMessageAccess', requireMessageAccess)
   vi.stubGlobal('getRouterParam', (_event: unknown, name: string) => params[name])
   vi.stubGlobal('createError', ({ statusCode, message }: { statusCode: number, message: string }) => new HttpError(statusCode, message))
   vi.stubGlobal('tables', schema)

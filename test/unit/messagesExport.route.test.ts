@@ -5,6 +5,7 @@ import { isDefaultMessageSort, resolveMessageSort, sortMessageRows } from '../..
 import { toCsv } from '../../shared/utils/csv'
 import type { MessageColumnField } from '../../shared/utils/messageFields'
 import { requirePlanFeature } from '../../server/utils/plans'
+import { requireMessageAccess } from '../../server/utils/messages'
 
 /**
  * GET /api/tenants/:tenantId/messages/export, run in plain Node with its Nitro
@@ -56,6 +57,7 @@ beforeEach(() => {
   }
   vi.stubGlobal('defineEventHandler', (handler: Handler) => handler)
   vi.stubGlobal('requirePlanFeature', requirePlanFeature)
+  vi.stubGlobal('requireMessageAccess', requireMessageAccess)
   vi.stubGlobal('getRouterParam', () => 'tenant-1')
   vi.stubGlobal('createError', ({ statusCode, message }: { statusCode: number, message: string }) => new HttpError(statusCode, message))
   vi.stubGlobal('setResponseHeaders', (_event: unknown, values: Record<string, string>) => Object.assign(headers, values))

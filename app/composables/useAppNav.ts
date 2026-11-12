@@ -33,7 +33,7 @@ export function useAppNav() {
     // Staff open every feature, so they can support any account
     const locked = (feature: PlanFeature) => !user.value?.isPlatformAdmin && !planIncludes(navTenant.value!.plan, feature)
     return [
-      { icon: 'i-lucide-message-square', label: 'Messages', to: `${base}/messages` },
+      { icon: 'i-lucide-message-square', label: 'Messages', to: `${base}/messages`, locked: locked('messages') },
       { icon: 'i-lucide-audio-lines', label: 'Recordings', to: `${base}/recordings`, locked: locked('recordings') },
       ...(hasRole(navTenant.value.role, 'admin') || user.value?.isPlatformAdmin
         ? [

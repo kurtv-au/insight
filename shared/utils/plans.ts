@@ -61,7 +61,7 @@ export interface PlanFeatureInfo {
 export const PLAN_FEATURES: readonly PlanFeatureInfo[] = [
   { key: 'dashboard', label: 'Dashboard access', minPlan: 'basic', enforced: false },
   { key: 'notifications', label: 'Notifications', minPlan: 'basic', enforced: false },
-  { key: 'messages', label: 'Access to messages', minPlan: 'basic', enforced: false },
+  { key: 'messages', label: 'Access to messages', minPlan: 'basic', enforced: true },
   { key: 'recordings', label: 'Listen to call recordings', minPlan: 'basic_plus', enforced: true },
   { key: 'support', label: 'Support', minPlan: 'basic_plus', enforced: false },
   { key: 'export', label: 'Exportable reporting', minPlan: 'basic_plus', enforced: true },

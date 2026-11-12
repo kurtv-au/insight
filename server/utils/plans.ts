@@ -1,5 +1,6 @@
 // How each enforced feature is named when a plan refuses it
 const REFUSED: Partial<Record<PlanFeature, string>> = {
+  messages: 'Messages aren’t',
   recordings: 'Call recordings aren’t',
   export: 'Exports aren’t'
 }

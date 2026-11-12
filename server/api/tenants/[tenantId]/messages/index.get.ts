@@ -8,7 +8,7 @@ const querySchema = messageRangeQuerySchema.extend({
 
 export default defineEventHandler(async (event) => {
   const tenantId = getRouterParam(event, 'tenantId')!
-  const { user, tenant } = await requireTenantRole(event, tenantId, 'viewer')
+  const { user, historyDays } = await requireMessageAccess(event, tenantId)
   const query = await getValidatedQuery(event, querySchema.parse)
   const empty = { items: [] as MessageRow[], total: 0, mock: false }
 
@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
     return empty
   }
 
-  const range = resolveMessageRange(query, planHistoryDays(tenant.plan))
+  const range = resolveMessageRange(query, historyDays)
   if (!range) {
     return empty
   }

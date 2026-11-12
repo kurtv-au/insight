@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { requirePlanFeature, seatLimitMessage } from '../../server/utils/plans'
 
@@ -32,8 +34,8 @@ describe('the plan table', () => {
     expect(included('customDevelopment')).toEqual(['enterprise'])
   })
 
-  it('enforces only recordings and exports', () => {
-    expect(PLAN_FEATURES.filter(feature => feature.enforced).map(feature => feature.key)).toEqual(['recordings', 'export'])
+  it('enforces messages, recordings and exports', () => {
+    expect(PLAN_FEATURES.filter(feature => feature.enforced).map(feature => feature.key)).toEqual(['messages', 'recordings', 'export'])
   })
 
   it('sets users and history per plan', () => {
@@ -104,6 +106,55 @@ describe('requireRecordingAccess', () => {
     const result = await requireRecordingAccess()
     expect(result.historyDays).toBe(2190)
     expect(result.accountNumbers).toEqual(['626'])
+  })
+})
+
+describe('requireMessageAccess', () => {
+  let access: { user: { id: string, isPlatformAdmin: boolean }, tenant: { id: string, plan: Plan }, role: string }
+  let requireTenantRole: ReturnType<typeof vi.fn>
+  let gate: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    vi.resetModules()
+    access = { user: { id: 'user-1', isPlatformAdmin: false }, tenant: { id: 'tenant-1', plan: 'basic' }, role: 'viewer' }
+    requireTenantRole = vi.fn(async () => access)
+    gate = vi.fn(requirePlanFeature)
+    vi.stubGlobal('createError', ({ statusCode, message }: { statusCode: number, message: string }) => new HttpError(statusCode, message))
+    vi.stubGlobal('requireTenantRole', requireTenantRole)
+    vi.stubGlobal('requirePlanFeature', gate)
+  })
+
+  async function requireMessageAccess() {
+    return (await import('../../server/utils/messages')).requireMessageAccess({} as never, 'tenant-1')
+  }
+
+  it('checks membership (viewers and up), then the plan, and returns the plan’s history', async () => {
+    const result = await requireMessageAccess()
+    expect(requireTenantRole).toHaveBeenCalledWith({}, 'tenant-1', 'viewer')
+    expect(gate).toHaveBeenCalledWith(access, 'messages')
+    expect(result.historyDays).toBe(365)
+  })
+
+  it('gives Enterprise six years', async () => {
+    access.tenant.plan = 'enterprise'
+    expect((await requireMessageAccess()).historyDays).toBe(2190)
+  })
+
+  it('goes no further for a non-member', async () => {
+    requireTenantRole.mockRejectedValue(new HttpError(404, 'Tenant not found'))
+    await expect(requireMessageAccess()).rejects.toMatchObject({ statusCode: 404 })
+    expect(gate).not.toHaveBeenCalled()
+  })
+
+  it('is the entry point of every messages route', () => {
+    const dir = join(__dirname, '../../server/api/tenants/[tenantId]/messages')
+    const routes = readdirSync(dir).filter(name => name.endsWith('.ts'))
+    expect(routes.length).toBeGreaterThan(0)
+    for (const route of routes) {
+      const source = readFileSync(join(dir, route), 'utf8')
+      expect(source, route).toContain('requireMessageAccess(event, tenantId)')
+      expect(source, route).not.toContain('requireTenantRole(')
+    }
   })
 })
 

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { H3Event } from 'h3'
 import { auApiMessages, MESSAGES_UNAVAILABLE } from '../messages/au-api'
 import { mockMessages } from '../messages/mock'
 
@@ -59,6 +60,17 @@ export function messageSource(): MessageSource {
     return mockMessages
   }
   throw createError({ statusCode: 503, message: MESSAGES_UNAVAILABLE })
+}
+
+/**
+ * The entry point for every messages route: a member (viewer and up) of an
+ * account whose plan includes messages (staff get past the plan), with the
+ * plan's history window.
+ */
+export async function requireMessageAccess(event: H3Event, tenantId: string) {
+  const access = await requireTenantRole(event, tenantId, 'viewer')
+  requirePlanFeature(access, 'messages')
+  return { ...access, historyDays: planHistoryDays(access.tenant.plan) }
 }
 
 /**

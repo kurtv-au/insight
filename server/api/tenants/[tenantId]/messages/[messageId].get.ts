@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm'
 // anything else is the same 404.
 export default defineEventHandler(async (event) => {
   const tenantId = getRouterParam(event, 'tenantId')!
-  const { user, tenant } = await requireTenantRole(event, tenantId, 'viewer')
+  const { user, historyDays } = await requireMessageAccess(event, tenantId)
 
   const [fields, match] = await Promise.all([visibleMessageFields(tenantId), memberMessageMatch(tenantId, user)])
   const accounts = await useDb().query.tenantRecordingAccounts.findMany({
@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
         match
       })
     : null
-  const historyStart = messageHistoryStart(planHistoryDays(tenant.plan))
+  const historyStart = messageHistoryStart(historyDays)
   if (!message || !message.createdAt || message.createdAt < historyStart || !messageMatches(message.values, match)) {
     throw createError({ statusCode: 404, message: 'Message not found' })
   }
